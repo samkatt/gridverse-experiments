@@ -1,5 +1,5 @@
 Welcome to gridverse-experiments's documentation!
-======================================
+=================================================
 
 .. toctree::
    :maxdepth: 2
