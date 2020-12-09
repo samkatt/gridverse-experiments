@@ -1,24 +1,11 @@
 #!/usr/bin/env python
-
 """Tests for `gridverse_experiments` package."""
 
-import pytest
+
+import pytest  # type: ignore
 
 
-from gridverse_experiments import gridverse_experiments
-
-
-@pytest.fixture
-def response():
-    """Sample pytest fixture.
-
-    See more at: http://doc.pytest.org/en/latest/fixture.html
-    """
-    # import requests
-    # return requests.get('https://github.com/audreyr/cookiecutter-pypackage')
-
-
-def test_content(response):
-    """Sample pytest test function with the pytest fixture as an argument."""
-    # from bs4 import BeautifulSoup
-    # assert 'GitHub' in BeautifulSoup(response.content).title.string
+@pytest.mark.parametrize("truth", [(True, True)])
+def test_this_is_working(truth):
+    """If this fails I can not help you"""
+    assert truth

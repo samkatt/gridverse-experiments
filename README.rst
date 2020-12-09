@@ -3,9 +3,6 @@ gridverse-experiments
 =====================
 
 
-.. image:: https://img.shields.io/pypi/v/gridverse_experiments.svg
-        :target: https://pypi.python.org/pypi/gridverse_experiments
-
 .. image:: https://img.shields.io/travis/samkatt/gridverse_experiments.svg
         :target: https://travis-ci.com/samkatt/gridverse_experiments
 

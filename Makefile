@@ -68,6 +68,8 @@ docs: ## generate Sphinx HTML documentation, including API docs
 	sphinx-apidoc -o docs/ gridverse_experiments
 	$(MAKE) -C docs clean
 	$(MAKE) -C docs html
+
+docs-open: docs
 	$(BROWSER) docs/_build/html/index.html
 
 servedocs: docs ## compile the docs watching for changes
