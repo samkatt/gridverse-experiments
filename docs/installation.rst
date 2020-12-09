@@ -4,24 +4,7 @@
 Installation
 ============
 
-
-Stable release
---------------
-
-To install gridverse-experiments, run this command in your terminal:
-
-.. code-block:: console
-
-    $ pip install gridverse_experiments
-
-This is the preferred method to install gridverse-experiments, as it will always install the most recent stable release.
-
-If you don't have `pip`_ installed, this `Python installation guide`_ can guide
-you through the process.
-
-.. _pip: https://pip.pypa.io
-.. _Python installation guide: http://docs.python-guide.org/en/latest/starting/installation/
-
+This package has not been published.
 
 From sources
 ------------
@@ -38,7 +21,7 @@ Or download the `tarball`_:
 
 .. code-block:: console
 
-    $ curl -OJL https://github.com/samkatt/gridverse_experiments/tarball/master
+    $ curl -OJL https://github.com/samkatt/gridverse_experiments/tarball/main
 
 Once you have a copy of the source, you can install it with:
 
@@ -46,6 +29,22 @@ Once you have a copy of the source, you can install it with:
 
     $ python setup.py install
 
+Or:
+
+.. code-block:: console
+
+    $ python -m pip install .
+
+Dependencies
+------------
+
+This package requires dependencies not easily available through pip:
+
+- `Online POMDP planning <https://github.com/samkatt/online-pomdp-planning>`_ 
+- `POMDP belief tracking <https://github.com/samkatt/pomdp-belief-tracking>`_ 
+- `Gym Gridverse <https://github.com/abaisero/gym-gridverse>`
+
+Please install them per their instructions.
 
 .. _Github repo: https://github.com/samkatt/gridverse_experiments
-.. _tarball: https://github.com/samkatt/gridverse_experiments/tarball/master
+.. _tarball: https://github.com/samkatt/gridverse_experiments/tarball/main
