@@ -11,7 +11,7 @@ with open("HISTORY.rst") as history_file:
     history = history_file.read()
 
 requirements = [
-    "gym_gridverse @ git+ssh://git@github.com/abaisero/gym-gridverse.git@fe6d5dfa4ec62e893d6335c62f4d2b8d2cec4159",
+    "gym_gridverse @ git+ssh://git@github.com/abaisero/gym-gridverse.git@master",
     "online_pomdp_planning @ git+ssh://git@github.com/samkatt/online-pomdp-planning.git@master",
     "pomdp_belief_tracking @ git+ssh://git@github.com/samkatt/pomdp-belief-tracking.git@main",
 ]
