@@ -17,7 +17,7 @@ observation_space:
   colors: [ NONE ]
 
 reset_function:
-  name: minigrid_dynamic_obstacles
+  name: dynamic_obstacles
   num_obstacles: 1
   random_agent: False
 
@@ -45,7 +45,7 @@ observation_function:
   name: full_observation
 
 terminating_function:
-  name: chain_any
+  name: reduce_any
   terminating_functions:
     - name: reach_goal
     - name: bump_moving_obstacle

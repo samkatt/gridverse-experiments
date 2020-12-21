@@ -21,7 +21,7 @@ Features
 Provides the glue, logging and visualization code for applying POMDP learning
 or planning solutions to gym-gridverse_ package (domains):
 
-- Online planning solutions through planners_ and belief-trackers_
+- Online planning solutions :mod:`gridverse_experiments.online_planning`
 - Visualize average return
 
 Credits
@@ -33,5 +33,3 @@ This package was created with Cookiecutter_ and the `audreyr/cookiecutter-pypack
 .. _`audreyr/cookiecutter-pypackage`: https://github.com/audreyr/cookiecutter-pypackage
 .. _Github: https://github.com/samkatt/gridverse-experiments
 .. _gym-gridverse: https://github.com/abaisero/gym-gridverse
-.. _planners: https://github.com/samkatt/online-pomdp-planning
-.. _belief-trackers: https://github.com/samkatt/pomdp-belief-tracking

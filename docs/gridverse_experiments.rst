@@ -12,10 +12,10 @@ gridverse\_experiments.cli module
    :undoc-members:
    :show-inheritance:
 
-gridverse\_experiments.gridverse\_experiments module
-----------------------------------------------------
+gridverse\_experiments.online\_planning module
+----------------------------------------------
 
-.. automodule:: gridverse_experiments.gridverse_experiments
+.. automodule:: gridverse_experiments.online_planning
    :members:
    :undoc-members:
    :show-inheritance:
