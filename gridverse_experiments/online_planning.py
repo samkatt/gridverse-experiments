@@ -24,7 +24,10 @@ from gym_gridverse.state import State as GVerseState
 from online_pomdp_planning import types as planning_types
 from online_pomdp_planning.mcts import create_POUCT
 from pomdp_belief_tracking import types as belief_types
-from pomdp_belief_tracking.pf import AcceptionProgressBar, create_rejection_sampling
+from pomdp_belief_tracking.pf.rejection_sampling import (
+    AcceptionProgressBar,
+    create_rejection_sampling,
+)
 
 
 def belief_sim_from(
