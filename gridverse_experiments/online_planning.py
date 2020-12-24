@@ -26,6 +26,7 @@ from online_pomdp_planning.mcts import create_POUCT
 from pomdp_belief_tracking import types as belief_types
 from pomdp_belief_tracking.pf.rejection_sampling import (
     AcceptionProgressBar,
+    accept_noop,
     create_rejection_sampling,
 )
 
@@ -107,6 +108,7 @@ def episode(
     belief_update: belief_types.BeliefUpdate,
     belief: belief_types.StateDistribution,
     domain: InnerEnv,
+    verbose: bool,
 ) -> List[float]:
     """Runs a single episode
 
@@ -121,6 +123,8 @@ def episode(
     :type belief: belief_types.StateDistribution
     :param domain: the actual environment in which actions are taken
     :type domain: InnerEnv
+    :param verbose: whether to print to stdout
+    :type verbose: bool
     :return: a list of rewards
     :rtype: List[float]
     """
@@ -131,7 +135,8 @@ def episode(
     t = False
     while not t:
 
-        print(f"{domain.state.agent}, planning action...")
+        if verbose:
+            print(f"{domain.state.agent}, planning action...")
 
         a, planner_info = planner(belief)
         assert isinstance(a, GVerseAction)  # XXX: should not be necessary for mypy?!
@@ -139,23 +144,69 @@ def episode(
         r, t = domain.step(a)
         rewards.append(r)
 
-        print(
-            f"Planner evaluated actions: {planner_info['max_q_action_selector-values']}"
-            f"Taken {a} for reward={r}, updating belief..."
-        )
+        if verbose:
+            print(
+                f"Planner evaluated actions: {planner_info['max_q_action_selector-values']}"
+                f"Taken {a} for reward={r}, updating belief..."
+            )
 
         belief, _ = belief_update(belief, a, domain.observation)
 
     return rewards
 
 
-def main() -> None:
-    """Main function of online planning
+def plan_online(
+    domain_name: str,
+    num_particles: int,
+    num_sims: int,
+    exploration_const: float,
+    runs: int,
+    verbose: bool = True,
+) -> None:
+    """plan online function of online planning
 
     Call the script with ``-h`` for the accepted arguments. The bare minimum is
     the first argument, a path to a `YAML` file describing the grid-verse
     environment.
     """
+    domain = factory_env_from_yaml(domain_name)
+
+    planner = create_POUCT(
+        domain.action_space.actions,
+        planner_sim_from(domain),
+        num_sims,
+        progress_bar=verbose,
+        ucb_constant=exploration_const,
+    )
+
+    process_acpt = AcceptionProgressBar(num_particles) if verbose else accept_noop
+    belief_update = create_rejection_sampling(
+        belief_sim_from(domain),
+        num_particles,
+        process_acpt=process_acpt,  # type: ignore
+    )
+
+    # run experiment
+    rewards: List[List[float]] = []
+    for _ in range(runs):
+        rewards.append(
+            episode(
+                planner=planner,
+                belief_update=belief_update,
+                belief=domain.functional_reset,
+                domain=domain,
+                verbose=verbose,
+            )
+        )
+        if verbose:
+            print("Episode terminated")
+
+    # TODO: process returns
+    if verbose:
+        print(rewards)
+
+
+if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
 
@@ -172,41 +223,11 @@ def main() -> None:
     # process arguments
     args = parser.parse_args()
 
-    num_particles = args.particles
-    num_sims = args.simulations
-    u = args.exploration_constant
-
-    # initiate agent and enviornment
-    domain = factory_env_from_yaml(args.env)
-    planner = create_POUCT(
-        domain.action_space.actions,
-        planner_sim_from(domain),
-        num_sims,
-        progress_bar=True,
-        ucb_constant=u,
+    plan_online(
+        args.env,
+        args.particles,
+        args.simulations,
+        args.exploration_constant,
+        args.runs,
+        verbose=True,
     )
-    belief_update = create_rejection_sampling(
-        belief_sim_from(domain),
-        num_particles,
-        process_acpt=AcceptionProgressBar(num_particles),
-    )
-
-    # run experiment
-    rewards: List[List[float]] = []
-    for _ in range(args.runs):
-        rewards.append(
-            episode(
-                planner=planner,
-                belief_update=belief_update,
-                belief=domain.functional_reset,
-                domain=domain,
-            )
-        )
-        print("Episode terminated")
-
-    # TODO: process returns
-    print(rewards)
-
-
-if __name__ == "__main__":
-    main()
