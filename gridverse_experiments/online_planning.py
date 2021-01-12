@@ -45,13 +45,10 @@ def belief_sim_from(
     class Sim(belief_types.Simulator):
         """A simulator for the belief created from grid-verse domain"""
 
-        def __call__(  # type: ignore
+        def __call__(
             self, s: GVerseState, a: GVerseAction
         ) -> Tuple[GVerseState, GVerseObs]:
             """A ``online_pomdp_planning`` simulator through ``gym-gridverse`` elements
-
-            TODO: mypy does not accept this signature, see ignored type
-            statement above, not sure how to solve the type inference problem.
 
             :param s: current state
             :type s: GVerseState
@@ -81,13 +78,10 @@ def planner_sim_from(
     class Sim(planning_types.Simulator):
         """A simulator for the belief created from grid-verse domain"""
 
-        def __call__(  # type: ignore
+        def __call__(
             self, s: GVerseState, a: GVerseAction
         ) -> Tuple[GVerseState, GVerseObs, float, bool]:
             """A ``online_pomdp_planning`` simulator through ``gym-gridverse`` elements
-
-            TODO: mypy does not accept this signature, see ignored type
-            statement above, not sure how to solve the type inference problem.
 
             :param s: current state
             :type s: GVerseState
@@ -139,7 +133,8 @@ def episode(
             print(f"{domain.state.agent}, planning action...")
 
         a, planner_info = planner(belief)
-        assert isinstance(a, GVerseAction)  # XXX: should not be necessary for mypy?!
+
+        assert isinstance(a, GVerseAction)
 
         r, t = domain.step(a)
         rewards.append(r)
@@ -183,7 +178,7 @@ def plan_online(
     belief_update = create_rejection_sampling(
         belief_sim_from(domain),
         num_particles,
-        process_acpt=process_acpt,  # type: ignore
+        process_acpt=process_acpt,
     )
 
     # run experiment

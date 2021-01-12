@@ -2,7 +2,7 @@
 """Tests for `gridverse_experiments` package."""
 
 
-import pytest  # type: ignore
+# import pytest  # type: ignore
 
 from gridverse_experiments.online_planning import plan_online
 
