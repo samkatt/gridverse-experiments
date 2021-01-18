@@ -10,7 +10,7 @@ Call this script with a path to the environment YAML file and parameters::
     python gridverse_experiments/online_planning.py -h
 
     python gridverse_experiments/online_planning.py \
-            configs/gv_empty.4x4.deterministic_agent.yaml \
+            configs/gv_empty.4x4.yaml \
             --logging DEBUG --runs 5 --ucb 5 --sim 128 --part 16
 
 Otherwise use as a library and provide YAML files to
@@ -26,9 +26,11 @@ Otherwise use as a library and provide YAML files to
 
 import argparse
 import logging
-from typing import Any, Dict, List, NamedTuple, Tuple
+import os
+import shutil
+from typing import Any, Dict, List, Tuple
 
-import numpy as np
+import pandas as pd
 import yaml
 from gym_gridverse.action import Action as GVerseAction
 from gym_gridverse.envs.inner_env import InnerEnv
@@ -103,36 +105,25 @@ def planner_sim_from(
     return Sim()
 
 
-class EpisodeResult(NamedTuple):
-    """Data-type that stores the return of an episode"""
-
-    rewards: List[float]
-    """rewards[t] contains the reward of time step t"""
-    planning_info: List[planning_types.Info]
-    """planning_info[t] contains the info returned by planner at time step t"""
-    belief_info: List[belief_types.Info]
-    """belief_info[t] contains the info returned by belief update at time step t"""
-
-    def discounted_return(self, discount: float) -> float:
-        """computes return of rewards given a ``discount`` factor.
-
-        :param discount: "gamma" of the problem
-        """
-        return utils.discounted_return(self.rewards, discount)
-
-
 def episode(
     planner: planning_types.Planner,
     belief: belief_types.Belief,
     domain: InnerEnv,
-) -> EpisodeResult:
+) -> List[Dict[str, Any]]:
     """Runs a single episode
 
     Acts in ``domain`` according to actions picked by ``planner``, using
     beliefs updated by the ``belief_update`` starting from ``belief``.
 
-    Returns information returned by the planner and belief in a list, where the
-    nth element is the info of the nth episode step.
+    Returns a list of dictionaries, one for each timestep. The dictionary includes things as:
+
+        - "reward": the reward give to the agent at the time step
+        - "terminal": whether the step was terminal (should really only be last, if any)
+        - "timestep": the time step (should be equal to the index)
+        - information from the planner info
+        - information from belief info
+
+    TODO: include horizon
 
     :param planner: the belief-based policy
     :param belief: updates belief in between taking actions
@@ -142,12 +133,12 @@ def episode(
     logger = logging.getLogger("episode")
 
     domain.reset()
-    rewards: List[float] = []
-    planning_infos: List[planning_types.Info] = []
-    belief_infos: List[belief_types.Info] = []
 
-    t = False
-    while not t:
+    info: List[Dict[str, Any]] = []
+
+    terminal = False
+    timestep = 0
+    while not terminal:
 
         logger.debug("%s, planning action...", domain.state.agent)
 
@@ -155,7 +146,7 @@ def episode(
 
         assert isinstance(a, GVerseAction)
 
-        r, t = domain.step(a)
+        r, terminal = domain.step(a)
 
         logger.debug(
             "Planner evaluated actions %s\nTaken %s for reward %s, updating belief...",
@@ -166,11 +157,19 @@ def episode(
 
         belief_info = belief.update(a, domain.observation)
 
-        rewards.append(r)
-        planning_infos.append(planner_info)
-        belief_infos.append(belief_info)
+        info.append(
+            {
+                "timestep": timestep,
+                "reward": r,
+                "terminal": terminal,
+                **planner_info,
+                **belief_info,
+            }
+        )
 
-    return EpisodeResult(rewards, planning_infos, belief_infos)
+        timestep += 1
+
+    return info
 
 
 def main(
@@ -179,7 +178,7 @@ def main(
     belief: belief_types.Belief,
     runs: int,
     logging_level: str,
-):
+) -> List[Dict[str, Any]]:
     """plan online function of online planning
 
     Handles calling :func:`episode` ::
@@ -188,44 +187,52 @@ def main(
             rewards = episode(domain, planner, belief_updat)
 
     In the episode actions are taken in ``domain`` according to the
-    ``planner``, which uses a belief maintained by ``belief``
+    ``planner``, which uses a belief maintained by ``belief``.
+
+    Returns a one-dimensional list of dictionaries. This is a flat
+    concatenation of the results returned by :func:`episode`. Each entry (dict)
+    has a key "run" that indicates the number o fthe run it was produced.
 
     :param domain:
     :param planner:
     :param belief:
     :param runs:
     :param logging_level:
+    :return: flat concatenation of the results of each episode
     """
+
     utils.set_logging_options(logging_level)
 
     logger = logging.getLogger("plan-online")
     logger.info("starting %s run(s)", runs)
 
-    output: List[EpisodeResult] = []
+    output: List[Dict[str, Any]] = []
     for run in range(runs):
 
         belief.distribution = domain.functional_reset
 
-        output.append(
-            episode(
-                planner=planner,
-                belief=belief,
-                domain=domain,
-            )
+        episode_output = episode(
+            planner=planner,
+            belief=belief,
+            domain=domain,
         )
+
+        # here we explicitly add the information of which run the result was
+        # generated to each entry in the results
+        for o in episode_output:
+            o["run"] = run
+
+        # extend -- flat concatenation -- of our results
+        output.extend(episode_output)
 
         logger.info(
             "run %s/%s terminated: r(%s)",
             run + 1,
             runs,
-            output[-1].discounted_return(0.95),
+            utils.discounted_return([t["reward"] for t in episode_output], 0.95),
         )
 
-    logger.warning(
-        "Mean result of %s runs is %s",
-        runs,
-        np.mean(list(res.discounted_return(0.95) for res in output)),
-    )
+    return output
 
 
 def run_from_yaml(env_yaml_file: str, solution_params_yaml: str):
@@ -289,7 +296,18 @@ def run_from_dict(args: Dict[str, Any]):
         logging.warning("YAML file error: %s", str(e))
         exit()
 
-    main(domain, planner, belief, args["runs"], args["logging"])
+    if "save_path" in args and args["save_path"]:
+        utils.create_experiments_directory_or_exit(args["save_path"])
+
+    result = main(domain, planner, belief, args["runs"], args["logging"])
+
+    if "save_path" in args and args["save_path"]:
+        with open(os.path.join(args["save_path"], "params.yaml"), "w") as outfile:
+            yaml.dump(args, outfile, default_flow_style=False)
+        shutil.copyfile(args["env"], os.path.join(args["save_path"], "env.yaml"))
+        pd.DataFrame(result).to_pickle(
+            os.path.join(args["save_path"], "episodic_data.pkl")
+        )
 
 
 if __name__ == "__main__":
@@ -309,6 +327,7 @@ if __name__ == "__main__":
     parser.add_argument("--rollout_depth", "-d", type=int, default=100)
 
     parser.add_argument("--particles", "-b", type=int, default=32)
+    parser.add_argument("--save_path", type=str)
 
     parser.add_argument(
         "--logging",

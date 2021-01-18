@@ -33,3 +33,4 @@ dropout_rate: 0
 replay_update: True
 freeze_model: "" # in ["", "T", "O"]
 known_model: "" # in ["", "T", "O"]
+# save_path: /tmp/some/folder

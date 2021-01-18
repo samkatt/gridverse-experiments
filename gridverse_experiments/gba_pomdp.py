@@ -17,7 +17,7 @@ Example usage::
     python gridverse_experiments/gba_pomdp.py -D tiger --episodes 10 -H 30 \
             --expl 100 --num_sims 4096 --num_part 1024 -B rejection_sampling \
             --num_pretrain 4096 --alpha .1 --train on_true --num_nets 1 \
-            --belief_minimal 900 --logging DEBUG
+            --logging DEBUG
 
     # from experiments -- checking tensorboard logging
     python ../gridverse_experiments/gba_pomdp.py -D tiger --episodes 100 -H 30 \
@@ -34,7 +34,9 @@ Otherwise use as a library and provide YAML files to
 """
 
 import logging
+import os
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser, Namespace
+from collections import deque
 from copy import deepcopy
 from functools import partial
 from typing import Any, Callable, Dict, List, NamedTuple, Tuple
@@ -42,6 +44,7 @@ from typing import Any, Callable, Dict, List, NamedTuple, Tuple
 import general_bayes_adaptive_pomdps.pytorch_api
 import numpy as np
 import online_pomdp_planning.types as planner_types
+import pandas as pd
 import pomdp_belief_tracking.types as belief_types
 import yaml
 from general_bayes_adaptive_pomdps.agents.neural_networks.neural_pomdps import (
@@ -71,7 +74,7 @@ from pomdp_belief_tracking.pf import importance_sampling as IS
 from pomdp_belief_tracking.pf import particle_filter as PF
 from pomdp_belief_tracking.pf import rejection_sampling as RS
 
-import gridverse_experiments.utils
+from gridverse_experiments import utils
 
 
 def main(conf: Dict[str, Any]) -> None:
@@ -86,7 +89,10 @@ def main(conf: Dict[str, Any]) -> None:
     if not conf["belief_minimal_sample_size"]:
         conf["belief_minimal_sample_size"] = conf["num_particles"]
 
-    gridverse_experiments.utils.set_logging_options(conf["logging"])
+    if "save_path" in conf and conf["save_path"]:
+        utils.create_experiments_directory_or_exit(conf["save_path"])
+
+    utils.set_logging_options(conf["logging"])
     logger = logging.getLogger("GBA-POMDP")
 
     # TODO: improve API: give device to `BADDr`
@@ -125,11 +131,7 @@ def main(conf: Dict[str, Any]) -> None:
         """sets domain state in ``s`` to sampled initial state """
         return BADDr.AugmentedState(baddr.sample_domain_start_state(), s.model)
 
-    debug_info: List[EpisodeResult] = []
-
-    # results init
-    result_mean = np.zeros(conf["episodes"])
-    ret_m2 = np.zeros(conf["episodes"])
+    output: List[Dict[str, Any]] = []
 
     for run in range(conf["runs"]):
 
@@ -141,7 +143,7 @@ def main(conf: Dict[str, Any]) -> None:
         # TODO: refactor at some point
         baddr.reset(train_method, conf["learning_rate"], conf["online_learning_rate"])
 
-        tmp_res = np.zeros(conf["episodes"])
+        avg_recent_return = deque([], 50)
 
         for episode in range(conf["episodes"]):
 
@@ -154,12 +156,30 @@ def main(conf: Dict[str, Any]) -> None:
                     belief.distribution,
                 )
 
-            ret = run_episode(env, planner, belief, conf["horizon"])
-            tmp_res[episode] = ret.discounted_return(conf["gamma"])
+            episode_output = run_episode(env, planner, belief, conf["horizon"])
 
+            # here we explicitly add the information of which run the result
+            # was generated to each entry in the results
+            for o in episode_output:
+                o["episode"] = episode
+                o["run"] = run
+            # extend -- flat concatenation -- of our results
+            output.extend(episode_output)
+
+            discounted_return = utils.discounted_return(
+                [t["reward"] for t in episode_output], conf["gamma"]
+            )
+            avg_recent_return.append(discounted_return)
+
+            logger.warning(
+                "Episode %s/%s return: %s",
+                episode + 1,
+                conf["episodes"],
+                discounted_return,
+            )
             logger.info(
                 f"run {run+1}/{conf['runs']} episode {episode+1}/{conf['episodes']}: "
-                f"avg return: {np.mean(tmp_res[max(0, episode - 100):episode+1])}"
+                f"avg return: {np.mean(avg_recent_return)}"
             )
 
             if general_bayes_adaptive_pomdps.pytorch_api.tensorboard_logging():
@@ -170,31 +190,15 @@ def main(conf: Dict[str, Any]) -> None:
 
             if general_bayes_adaptive_pomdps.pytorch_api.tensorboard_logging():
                 general_bayes_adaptive_pomdps.pytorch_api.log_tensorboard(
-                    "return", tmp_res[episode], episode
+                    "return", discounted_return, episode
                 )
 
-            debug_info.append(ret)
-
-        # update mean and variance
-        delta = tmp_res - result_mean
-        result_mean += delta / (run + 1)
-        delta_2 = tmp_res - result_mean
-        ret_m2 += delta * delta_2
-
-        ret_var = np.zeros(conf["episodes"]) if run < 2 else ret_m2 / (run - 1)
-        stder = np.zeros(conf["episodes"]) if run < 2 else np.sqrt(ret_var / run)
-
-        # process results into rows of for each episode
-        # return avg, return var, return #, return stder
-        summary = np.transpose(
-            [result_mean, ret_var, [run + 1] * conf["episodes"], stder]
-        )
-
-        np.savetxt(
-            conf["file"],
-            summary,
-            delimiter=", ",
-            header=f"{conf}\nreturn mean, return var, return count, return stder",
+    if "save_path" in conf and conf["save_path"]:
+        with open(os.path.join(conf["save_path"], "params.yaml"), "w") as outfile:
+            yaml.dump(conf, outfile, default_flow_style=False)
+        # shutil.copyfile(conf["env"], os.path.join(conf["save_path"], "env.yaml"))
+        pd.DataFrame(output).to_pickle(
+            os.path.join(conf["save_path"], "episodic_data.pkl")
         )
 
 
@@ -253,7 +257,7 @@ class EpisodeResult(NamedTuple):
 
         :param discount: "gamma" of the problem
         """
-        return gridverse_experiments.utils.discounted_return(self.rewards, discount)
+        return utils.discounted_return(self.rewards, discount)
 
 
 def run_episode(
@@ -261,26 +265,32 @@ def run_episode(
     planner: planner_types.Planner,
     belief: belief_types.Belief,
     horizon: int,
-) -> EpisodeResult:
+) -> List[Dict[str, Any]]:
     """runs a single episode
 
     Returns information returned by the planner and belief in a list, where the
     nth element is the info of the nth episode step.
 
+    Returns a list of dictionaries, one for each timestep. The dictionary includes things as:
+
+        - "reward": the reward give to the agent at the time step
+        - "terminal": whether the step was terminal (should really only be last, if any)
+        - "timestep": the time step (should be equal to the index)
+        - information from the planner info
+        - information from belief info
+
     :param env:
     :param planner:
     :param belief:
     :param horizon: length of episode
-    :returns: the rewards and (debug) info from planner and belief
+    :return: a list of episode results (rewards and info dictionaries)
     """
 
     logger = logging.getLogger("episode")
 
-    rewards: List[float] = []
-    planning_infos: List[planner_types.Info] = []
-    belief_infos: List[belief_types.Info] = []
+    info: List[Dict[str, Any]] = []
 
-    for _ in range(horizon):
+    for timestep in range(horizon):
 
         # actual step
         action, planning_info = planner(belief.sample)
@@ -290,15 +300,20 @@ def run_episode(
 
         belief_info = belief.update(action, step.observation)
 
-        # store step
-        rewards.append(step.reward)
-        planning_infos.append(planning_info)
-        belief_infos.append(belief_info)
+        info.append(
+            {
+                "timestep": timestep,
+                "reward": step.reward,
+                "terminal": step.terminal,
+                **planning_info,
+                **belief_info,
+            }
+        )
 
         if step.terminal:
             break
 
-    return EpisodeResult(rewards, planning_infos, belief_infos)
+    return info
 
 
 def create_planner(
@@ -759,6 +774,13 @@ if __name__ == "__main__":
         type=str,
         help="What parts of the models is known prior learning (and thus need not be learned)",
         choices=["", "T", "O"],
+    )
+
+    parser.add_argument(
+        "--save_path",
+        type=str,
+        default="",
+        help="When given, will save results of experiments in provided folder path",
     )
 
     main(vars(parser.parse_args()))

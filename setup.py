@@ -16,6 +16,7 @@ requirements = [
     "pomdp_belief_tracking @ git+ssh://git@github.com/samkatt/pomdp-belief-tracking.git@main",
     "numpy",
     "pyyaml",
+    "pandas",
 ]
 
 setup_requirements = [
