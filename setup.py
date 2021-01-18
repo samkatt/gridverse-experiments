@@ -14,6 +14,8 @@ requirements = [
     "gym_gridverse @ git+ssh://git@github.com/abaisero/gym-gridverse.git@master",
     "online_pomdp_planning @ git+ssh://git@github.com/samkatt/online-pomdp-planning.git@master",
     "pomdp_belief_tracking @ git+ssh://git@github.com/samkatt/pomdp-belief-tracking.git@main",
+    "numpy",
+    "pyyaml",
 ]
 
 setup_requirements = [

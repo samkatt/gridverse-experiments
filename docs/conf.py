@@ -22,7 +22,7 @@ import sys
 
 sys.path.insert(0, os.path.abspath(".."))
 
-import gridverse_experiments
+import gridverse_experiments  # isort:skip
 
 # -- General configuration ---------------------------------------------
 
@@ -34,6 +34,7 @@ import gridverse_experiments
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
 extensions = [
     "sphinx.ext.autodoc",
+    "sphinx_autodoc_typehints",
     "sphinx.ext.viewcode",
     "sphinx.ext.autosummary",
     "sphinx.ext.todo",
@@ -174,6 +175,8 @@ texinfo_documents = [
         "Miscellaneous",
     ),
 ]
+
+autoclass_content = "both"
 
 # dev options
 todo_emit_warnings = True

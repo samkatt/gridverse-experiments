@@ -1,0 +1,7 @@
+runs: 5
+discount_factor: .95
+ucb_constant: 5
+simulations: 32
+rollout_depth: 100
+particles: 32
+logging: "DEBUG"

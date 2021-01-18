@@ -5,7 +5,18 @@ online-planners_ and belief-tracking_. It contains some 'glue' code, to connect
 the two, and provides a straightforward interface to run an :func:`episode`
 with different configurations.
 
-Call this script with a path to the environment YAML file.
+Call this script with a path to the environment YAML file and parameters::
+
+    python gridverse_experiments/online_planning.py -h
+
+    python gridverse_experiments/online_planning.py \
+            configs/gv_empty.4x4.deterministic_agent.yaml \
+            --logging DEBUG --runs 5 --ucb 5 --sim 128 --part 16
+
+Otherwise use as a library and provide YAML files to
+
+.. autofunction:: run_from_yaml
+   :noindex:
 
 .. _Gridverse: https://github.com/abaisero/gym-gridverse
 .. _online-planners:  https://github.com/samkatt/online-pomdp-planners
@@ -14,8 +25,11 @@ Call this script with a path to the environment YAML file.
 """
 
 import argparse
-from typing import List, Tuple
+import logging
+from typing import Any, Dict, List, NamedTuple, Tuple
 
+import numpy as np
+import yaml
 from gym_gridverse.action import Action as GVerseAction
 from gym_gridverse.envs.inner_env import InnerEnv
 from gym_gridverse.envs.yaml.factory import factory_env_from_yaml
@@ -30,6 +44,8 @@ from pomdp_belief_tracking.pf.rejection_sampling import (
     create_rejection_sampling,
 )
 
+from gridverse_experiments import utils
+
 
 def belief_sim_from(
     gridverse_inner_env: InnerEnv,
@@ -37,9 +53,7 @@ def belief_sim_from(
     """Transforms ``gridverse_inner_env`` into a sim usable for the belief
 
     :param gridverse_inner_env: a domain from ``gym_gridverse``
-    :type gridverse_inner_env: InnerEnv
     :return: a simulator suitable for ``pomdp_belief_tracking``
-    :rtype: belief_types.Simulator
     """
 
     class Sim(belief_types.Simulator):
@@ -51,17 +65,14 @@ def belief_sim_from(
             """A ``online_pomdp_planning`` simulator through ``gym-gridverse`` elements
 
             :param s: current state
-            :type s: GVerseState
             :param a: current action
-            :type a: GVerseAction
             :return: next state-observation-reward pair
-            :rtype: Tuple[GVerseState, GVerseObs]
             """
             next_s, _, _ = gridverse_inner_env.functional_step(s, a)
             o = gridverse_inner_env.functional_observation(next_s)
             return next_s, o
 
-    return Sim()  # should be acceptable for mypy?!
+    return Sim()
 
 
 def planner_sim_from(
@@ -70,9 +81,7 @@ def planner_sim_from(
     """Transforms ``gridverse_inner_env`` into a sim usable for the planner
 
     :param gridverse_inner_env: a domain from ``gym_gridverse``
-    :type gridverse_inner_env: InnerEnv
     :return: a simulator suitable for ``online_pomdp_planning``
-    :rtype: planning_types.Simulator
     """
 
     class Sim(planning_types.Simulator):
@@ -84,11 +93,8 @@ def planner_sim_from(
             """A ``online_pomdp_planning`` simulator through ``gym-gridverse`` elements
 
             :param s: current state
-            :type s: GVerseState
             :param a: current action
-            :type a: GVerseAction
             :return: next state-observation-reward pair and whether transition is terminal
-            :rtype: planning_types.Simulator
             """
             next_s, r, t = gridverse_inner_env.functional_step(s, a)
             o = gridverse_inner_env.functional_observation(next_s)
@@ -97,132 +103,218 @@ def planner_sim_from(
     return Sim()
 
 
+class EpisodeResult(NamedTuple):
+    """Data-type that stores the return of an episode"""
+
+    rewards: List[float]
+    """rewards[t] contains the reward of time step t"""
+    planning_info: List[planning_types.Info]
+    """planning_info[t] contains the info returned by planner at time step t"""
+    belief_info: List[belief_types.Info]
+    """belief_info[t] contains the info returned by belief update at time step t"""
+
+    def discounted_return(self, discount: float) -> float:
+        """computes return of rewards given a ``discount`` factor.
+
+        :param discount: "gamma" of the problem
+        """
+        return utils.discounted_return(self.rewards, discount)
+
+
 def episode(
     planner: planning_types.Planner,
-    belief_update: belief_types.BeliefUpdate,
-    belief: belief_types.StateDistribution,
+    belief: belief_types.Belief,
     domain: InnerEnv,
-    verbose: bool,
-) -> List[float]:
+) -> EpisodeResult:
     """Runs a single episode
 
     Acts in ``domain`` according to actions picked by ``planner``, using
     beliefs updated by the ``belief_update`` starting from ``belief``.
 
+    Returns information returned by the planner and belief in a list, where the
+    nth element is the info of the nth episode step.
+
     :param planner: the belief-based policy
-    :type planner: planning_types.Planner
-    :param belief_update: updates belief in between taking actions
-    :type belief_update: belief_types.BeliefUpdate
-    :param belief: the initial belief
-    :type belief: belief_types.StateDistribution
+    :param belief: updates belief in between taking actions
     :param domain: the actual environment in which actions are taken
-    :type domain: InnerEnv
-    :param verbose: whether to print to stdout
-    :type verbose: bool
-    :return: a list of rewards
-    :rtype: List[float]
+    :return: a list of episode results (rewards and info dictionaries)
     """
+    logger = logging.getLogger("episode")
 
     domain.reset()
     rewards: List[float] = []
+    planning_infos: List[planning_types.Info] = []
+    belief_infos: List[belief_types.Info] = []
 
     t = False
     while not t:
 
-        if verbose:
-            print(f"{domain.state.agent}, planning action...")
+        logger.debug("%s, planning action...", domain.state.agent)
 
-        a, planner_info = planner(belief)
+        a, planner_info = planner(belief.sample)
 
         assert isinstance(a, GVerseAction)
 
         r, t = domain.step(a)
+
+        logger.debug(
+            "Planner evaluated actions %s\nTaken %s for reward %s, updating belief...",
+            planner_info["max_q_action_selector-values"],
+            a,
+            r,
+        )
+
+        belief_info = belief.update(a, domain.observation)
+
         rewards.append(r)
+        planning_infos.append(planner_info)
+        belief_infos.append(belief_info)
 
-        if verbose:
-            print(
-                f"Planner evaluated actions: {planner_info['max_q_action_selector-values']}"
-                f"Taken {a} for reward={r}, updating belief..."
-            )
-
-        belief, _ = belief_update(belief, a, domain.observation)
-
-    return rewards
+    return EpisodeResult(rewards, planning_infos, belief_infos)
 
 
-def plan_online(
-    domain_name: str,
-    num_particles: int,
-    num_sims: int,
-    exploration_const: float,
+def main(
+    domain: InnerEnv,
+    planner: planning_types.Planner,
+    belief: belief_types.Belief,
     runs: int,
-    verbose: bool = True,
-) -> None:
+    logging_level: str,
+):
     """plan online function of online planning
 
-    Call the script with ``-h`` for the accepted arguments. The bare minimum is
-    the first argument, a path to a `YAML` file describing the grid-verse
-    environment.
+    Handles calling :func:`episode` ::
+
+        for r in runs:
+            rewards = episode(domain, planner, belief_updat)
+
+    In the episode actions are taken in ``domain`` according to the
+    ``planner``, which uses a belief maintained by ``belief``
+
+    :param domain:
+    :param planner:
+    :param belief:
+    :param runs:
+    :param logging_level:
     """
-    domain = factory_env_from_yaml(domain_name)
+    utils.set_logging_options(logging_level)
 
-    planner = create_POUCT(
-        domain.action_space.actions,
-        planner_sim_from(domain),
-        num_sims,
-        progress_bar=verbose,
-        ucb_constant=exploration_const,
-    )
+    logger = logging.getLogger("plan-online")
+    logger.info("starting %s run(s)", runs)
 
-    process_acpt = AcceptionProgressBar(num_particles) if verbose else accept_noop
-    belief_update = create_rejection_sampling(
-        belief_sim_from(domain),
-        num_particles,
-        process_acpt=process_acpt,
-    )
+    output: List[EpisodeResult] = []
+    for run in range(runs):
 
-    # run experiment
-    rewards: List[List[float]] = []
-    for _ in range(runs):
-        rewards.append(
+        belief.distribution = domain.functional_reset
+
+        output.append(
             episode(
                 planner=planner,
-                belief_update=belief_update,
-                belief=domain.functional_reset,
+                belief=belief,
                 domain=domain,
-                verbose=verbose,
             )
         )
-        if verbose:
-            print("Episode terminated")
 
-    # TODO: process returns
-    if verbose:
-        print(rewards)
+        logger.info(
+            "run %s/%s terminated: r(%s)",
+            run + 1,
+            runs,
+            output[-1].discounted_return(0.95),
+        )
+
+    logger.warning(
+        "Mean result of %s runs is %s",
+        runs,
+        np.mean(list(res.discounted_return(0.95) for res in output)),
+    )
+
+
+def run_from_yaml(env_yaml_file: str, solution_params_yaml: str):
+    """Calls :func:`plan_online` with arguments described in YAML
+
+    Under the hood calls :func:`_load_from_dict` to initiate the planner,
+    domain and belief update.
+
+    :param env_yaml_file: YAML path describing the gridverse domain scheme
+    :param solution_params_yaml: YAML path with parameters (`configs/example_online_planning.yaml`)
+    """
+    with open(solution_params_yaml) as f:
+        args = yaml.safe_load(f)
+
+    args["env"] = env_yaml_file
+    run_from_dict(args)
+
+
+def run_from_dict(args: Dict[str, Any]):
+    """Runs the program given arguments in ``args``
+
+    Messy function that loads the domain, planner and belief given
+    config in ``args``.
+
+    Will print out an error if the incorrect keys are given (or mising)
+
+    Then calls main
+
+    :param args:
+    """
+
+    try:
+        domain = factory_env_from_yaml(args["env"])
+
+        planner = create_POUCT(
+            actions=domain.action_space.actions,
+            sim=planner_sim_from(domain),
+            num_sims=args["simulations"],
+            init_stats=None,
+            policy=None,
+            ucb_constant=args["ucb_constant"],
+            rollout_depth=args["rollout_depth"],
+            discount_factor=args["discount_factor"],
+            progress_bar=args["logging"] == "DEBUG",
+        )
+
+        process_acpt = (
+            AcceptionProgressBar(args["particles"])
+            if args["logging"] == "DEBUG"
+            else accept_noop
+        )
+        belief_update = create_rejection_sampling(
+            sim=belief_sim_from(domain),
+            n=args["particles"],
+            process_acpt=process_acpt,
+        )
+
+        belief = belief_types.Belief(domain.functional_reset, belief_update)
+
+    except KeyError as e:
+        logging.warning("YAML file error: %s", str(e))
+        exit()
+
+    main(domain, planner, belief, args["runs"], args["logging"])
 
 
 if __name__ == "__main__":
+    """Runs GBA-POMDP
+
+    Assumes arguments are passed in per command line, calls main with them
+    """
 
     parser = argparse.ArgumentParser()
 
     parser.add_argument("env")
-
-    # initiate arguments
     parser.add_argument("--runs", "-n", type=int, default=1)
+    parser.add_argument("--discount_factor", "-y", type=float, default=0.95)
 
-    parser.add_argument("--exploration-constant", "-u", type=float, default=1)
-    parser.add_argument("--simulations", "-s", type=int, default=48)
+    parser.add_argument("--ucb_constant", "-u", type=float, default=1)
+    parser.add_argument("--simulations", "-s", type=int, default=32)
+    parser.add_argument("--rollout_depth", "-d", type=int, default=100)
 
-    parser.add_argument("--particles", "-b", type=int, default=48)
+    parser.add_argument("--particles", "-b", type=int, default=32)
 
-    # process arguments
-    args = parser.parse_args()
-
-    plan_online(
-        args.env,
-        args.particles,
-        args.simulations,
-        args.exploration_constant,
-        args.runs,
-        verbose=True,
+    parser.add_argument(
+        "--logging",
+        choices=["INFO", "DEBUG", "WARNING"],
+        default="INFO",
+        help="Logging level, set to `WARNING` for no output, `DEBUG` for additional info",
     )
+
+    run_from_dict(vars(parser.parse_args()))
