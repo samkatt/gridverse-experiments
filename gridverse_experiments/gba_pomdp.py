@@ -74,7 +74,7 @@ from pomdp_belief_tracking.pf import importance_sampling as IS
 from pomdp_belief_tracking.pf import particle_filter as PF
 from pomdp_belief_tracking.pf import rejection_sampling as RS
 
-from gridverse_experiments import utils
+from gridverse_experiments import conf, utils
 
 
 def main(conf: Dict[str, Any]) -> None:
@@ -550,6 +550,32 @@ def run_from_yaml(solution_params_yaml: str):
         args = yaml.safe_load(f)
 
     main(args)
+
+
+def generate_config_expansions(yaml_template_path: str) -> None:
+    """Tool to generate ``config.yaml`` files from ``yaml_template_path``
+
+    Assumes ``yaml_template_path`` is a ``yaml`` file that contains list
+    entries that are supposed to be 'expanded', i.e., generate a combinatorial
+    set. This function will do so, and write them to disk under a sane name
+
+    :param yaml_template_path: path to template config file with list entries
+    :returns: None, writes to disk
+    """
+
+    with open(yaml_template_path, "r") as input_file:
+        config = yaml.safe_load(input_file)
+    expansions = conf.expand_conf(config)
+
+    assert (
+        len(expansions) != 0
+    ), f"Somehow {yaml_template_path} generated zero expansions"
+
+    for n, c in expansions.items():
+        c["save_path"] = n
+        expansions_name = f"{n}.yaml"
+        with open(expansions_name, "w") as output_file:
+            yaml.dump(c, output_file, default_flow_style=False)
 
 
 if __name__ == "__main__":
