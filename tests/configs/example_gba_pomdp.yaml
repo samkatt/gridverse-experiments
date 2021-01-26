@@ -1,0 +1,29 @@
+logging: "WARNING" # in ["INFO", "DEBUG", "WARNING"]
+runs: 2
+horizon: 5
+episodes: 2
+gamma: 0.95
+num_sims: 64
+exploration: 1
+# rollout_policy: "" # ["", "default", "gridverse-extra"]  # NYI
+search_depth: 0
+pouct_evaluation: "inverted_goal_distance"  # in ["", "inverted_goal_distance"]
+belief: rejection_sampling # in ["rejection_sampling", "importance_sampling"]
+num_particles: 32
+belief_minimal_sample_size: 0 # in ["on_true", "on_prior"]
+# train_offline: "on_true"  # NYI
+optimizer: "SGD" # in ["SGD", "Adam"]
+learning_rate: .05
+online_learning_rate: .0001
+network_size: 32
+num_nets: 1
+batch_size: 32
+num_pretrain_epochs: 1028
+use_gpu: False
+random_seed: 0
+tensorboard_logdir: ""
+# perturb_stdev: 0
+# backprop: True
+dropout_rate: 0
+# replay_update: True
+# save_path: /tmp/some/folder

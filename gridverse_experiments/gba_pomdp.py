@@ -17,7 +17,9 @@ Example usage::
     python gridverse_experiments/gba_pomdp.py \
             configs/gv_empty.8x8.yaml --logging DEBUG \
             --episodes 2 --pouct_evaluation inverted_goal_distance \
-            -B rejection_sampling --learning_rate .05 --dropout_rate .5
+            -B rejection_sampling --learning_rate .025 \
+            --tensorboard experiments/heuristic-8x8/nodrop-025a \
+            --num_pret 4096
 
 Otherwise use as a library and provide YAML files to
 
@@ -316,7 +318,7 @@ def create_state_evaluation(strategy: str) -> Optional[MCTSEval]:
             """
             if t:
                 return 0.0
-            return inverted_goal_distance(s.domain_state)
+            return inverted_goal_distance(s.domain_state, multiplier=1)
 
         return evaluation
 

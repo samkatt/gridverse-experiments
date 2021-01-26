@@ -1,0 +1,9 @@
+runs: 2
+discount_factor: .95
+ucb_constant: 5
+simulations: 32
+rollout_depth: 10
+particles: 8
+logging: "WARNiNG"
+pouct_evaluation: "inverted_goal_distance"  # in ["", "inverted_goal_distance"]
+# save_path: "/tmp/to/some/experiments/folder"

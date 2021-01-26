@@ -10,7 +10,7 @@ Call this script with a path to the environment YAML file and parameters::
     python gridverse_experiments/online_planning.py -h
 
     python gridverse_experiments/online_planning.py \
-            configs/gv_empty.4x4.yaml \
+            configs/gv_empty.4x4.deterministic_agent.yaml \
             --logging DEBUG --runs 5 --ucb 5 --sim 128 --part 16 \
             --pouct_evaluation inverted_goal_distance
 
@@ -337,7 +337,7 @@ def create_state_evaluation(strategy: str) -> Optional[MCTSEval]:
             """
             if t:
                 return 0.0
-            return inverted_goal_distance(s)
+            return inverted_goal_distance(s, multiplier=1)
 
         return evaluation
 

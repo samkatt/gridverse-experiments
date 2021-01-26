@@ -1,0 +1,35 @@
+logging: "WARNING" # in ["INFO", "DEBUG", "WARNING"]
+domain: "tiger" # in [ "tiger", "gridworld", "collision_avoidance", "chain", "road_racer", "gridverse", ] domain_size: 0
+domain_size: 0
+domain_description: ""
+runs: 2
+horizon: 3
+episodes: 2
+gamma: 0.95
+num_sims: 128
+exploration: 100
+rollout_policy: "" # ["", "default", "gridverse-extra"]
+search_depth: 0
+belief: importance_sampling # in ["rejection_sampling", "importance_sampling"]
+num_particles: 32
+belief_minimal_sample_size: 0 # in ["on_true", "on_prior"]
+train_offline: "on_true"
+prior_certainty: 10
+prior_correctness: 0
+optimizer: "SGD" # in ["SGD", "Adam"]
+learning_rate: .05
+online_learning_rate: .0001
+network_size: 32
+num_nets: 1
+batch_size: 32
+num_pretrain_epochs: 512
+use_gpu: False
+random_seed: 0
+tensorboard_logdir: ""
+perturb_stdev: 0
+backprop: True
+dropout_rate: 0
+replay_update: True
+freeze_model: "" # in ["", "T", "O"]
+known_model: "" # in ["", "T", "O"]
+# save_path: /tmp/some/folder

@@ -58,5 +58,5 @@ def create_experiments_directory_or_exit(exp_dir_path: str) -> None:
     try:
         os.makedirs(exp_dir_path)
     except OSError as e:
-        logging.warning("Exiting! Provided path '%s' produced error: %s", exp_dir_path, str(e))
+        logging.warning("Exiting! Path '%s' produced error: %s", exp_dir_path, str(e))
         exit()

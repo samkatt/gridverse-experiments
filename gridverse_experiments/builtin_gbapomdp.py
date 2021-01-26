@@ -70,6 +70,7 @@ from general_bayes_adaptive_pomdps.models.baddr import (
 )
 from online_pomdp_planning.mcts import Policy
 from online_pomdp_planning.mcts import create_POUCT as lib_create_POUCT
+from online_pomdp_planning.mcts import create_rollout as lib_create_rollout
 from pomdp_belief_tracking.pf import importance_sampling as IS
 from pomdp_belief_tracking.pf import particle_filter as PF
 from pomdp_belief_tracking.pf import rejection_sampling as RS
@@ -323,11 +324,15 @@ def create_planner(
     actions = list(np.int64(i) for i in range(baddr.action_space.n))
     online_planning_sim = SimForPlanning(baddr)
 
+    rollout = lib_create_rollout(
+        rollout_policy, online_planning_sim, planning_horizon, discount
+    )
+
     return lib_create_POUCT(
         actions,
         online_planning_sim,
         num_sims,
-        policy=rollout_policy,
+        leaf_eval=rollout,
         discount_factor=discount,
         rollout_depth=planning_horizon,
         ucb_constant=exploration_constant,
