@@ -14,13 +14,13 @@ combination of belief-tracking_ and online-planning_.
 
 Example usage::
 
-    python gridverse_experiments/gba_pomdp.py -D tiger --episodes 10 -H 30 \
+    python gridverse_experiments/builtin_gbapomdp.py -D tiger --episodes 10 -H 30 \
             --expl 100 --num_sims 4096 --num_part 1024 -B rejection_sampling \
             --num_pretrain 4096 --alpha .1 --train on_true --num_nets 1 \
             --logging DEBUG
 
     # from experiments -- checking tensorboard logging
-    python ../gridverse_experiments/gba_pomdp.py -D tiger --episodes 100 -H 30 \
+    python ../gridverse_experiments/builtin_gbapomdp.py -D tiger --episodes 100 -H 30 \
             --expl 100 --num_sims 4096 --num_part 1024 -B importance_sampling \
             --num_pretrain 4096 --alpha .1 --train on_prior --prior_certainty 10 \
             --num_nets 20 --prior_correct 0 --online_learning_rate .01 --backprop \

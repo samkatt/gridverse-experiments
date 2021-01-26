@@ -14,17 +14,10 @@ combination of belief-tracking_ and online-planning_.
 
 Example usage::
 
-    python gridverse_experiments/gba_pomdp.py -D tiger --episodes 10 -H 30 \
-            --expl 100 --num_sims 4096 --num_part 1024 -B rejection_sampling \
-            --num_pretrain 4096 --alpha .1 --train on_true --num_nets 1 \
-            --logging DEBUG
-
-    # from experiments -- checking tensorboard logging
-    python ../gridverse_experiments/gba_pomdp.py -D tiger --episodes 100 -H 30 \
-            --expl 100 --num_sims 4096 --num_part 1024 -B importance_sampling \
-            --num_pretrain 4096 --alpha .1 --train on_prior --prior_certainty 10 \
-            --num_nets 20 --prior_correct 0 --online_learning_rate .01 --backprop \
-            --belief_minimal 32 --tensor test_learning_unique_32resample --logging DEBUG
+    python gridverse_experiments/gba_pomdp.py \
+            configs/gv_empty.8x8.yaml --logging DEBUG \
+            --episodes 2 --pouct_evaluation inverted_goal_distance \
+            -B rejection_sampling --learning_rate .05 --dropout_rate .5
 
 Otherwise use as a library and provide YAML files to
 
@@ -39,7 +32,7 @@ import shutil
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
 from collections import deque
 from functools import partial
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import general_bayes_adaptive_pomdps.pytorch_api
 import numpy as np
@@ -62,13 +55,14 @@ from gym_gridverse.envs.yaml.factory import factory_env_from_yaml
 from gym_gridverse.representations.observation_representations import (
     DefaultObservationRepresentation,
 )
-from online_pomdp_planning.mcts import Policy
+from online_pomdp_planning.mcts import Evaluation as MCTSEval
 from online_pomdp_planning.mcts import create_POUCT as lib_create_POUCT
 from pomdp_belief_tracking.pf import importance_sampling as IS
 from pomdp_belief_tracking.pf import particle_filter as PF
 from pomdp_belief_tracking.pf import rejection_sampling as RS
 
 from gridverse_experiments import conf, utils
+from gridverse_experiments.heuristics import inverted_goal_distance
 
 
 def main(conf: Dict[str, Any]) -> None:
@@ -115,11 +109,11 @@ def main(conf: Dict[str, Any]) -> None:
 
     planner = create_planner(
         baddr,
-        lambda s, o: baddr.action_space.sample(),
         conf["num_sims"],
         conf["exploration"],
         conf["search_depth"],
         conf["gamma"],
+        conf["pouct_evaluation"],
         conf["logging"],
     )
     belief = create_belief(
@@ -231,9 +225,10 @@ def run_episode(
         r, t = env.step(GVerseAction(action))
 
         logger.debug(
-            "A(%s) -> Pos(%s) --- r(%s)",
+            "A(%s) -> (%s %s) --- r(%s)",
             GVerseAction(action),
             env.state.agent.position,
+            env.state.agent.orientation,
             r,
         )
 
@@ -261,11 +256,11 @@ def run_episode(
 
 def create_planner(
     baddr: GBAPOMDPThroughAugmentedState,
-    rollout_policy: Policy,
     num_sims: int = 500,
     exploration_constant: float = 1.0,
     planning_horizon: int = 10,
     discount: float = 0.95,
+    pouct_evaluation: str = "",
     log_level: str = "INFO",
 ) -> planner_types.Planner:
     """The factory function for planners
@@ -275,27 +270,57 @@ def create_planner(
     Real `env` is used for the rollout policy
 
     :param baddr:
-    :param rollout_policy: the rollout policy
     :param num_sims: number of simulations to run
     :param exploration_constant: the UCB-constant for UCB
     :param planning_horizon: how far into the future to plan for
     :param discount: the discount factor to plan for
+    :param pouct_evaluation: leaf evaluation strategy (in ["", "pouct_evaluation"])
     :param log_level: in ["DEBUG", "INFO", "WARNING"]
     """
 
     actions = list(np.int64(i) for i in range(baddr.action_space.n))
     online_planning_sim = SimForPlanning(baddr)
+    state_evaluation = create_state_evaluation(pouct_evaluation)
 
     return lib_create_POUCT(
         actions,
         online_planning_sim,
         num_sims,
-        policy=rollout_policy,
         discount_factor=discount,
         rollout_depth=planning_horizon,
+        leaf_eval=state_evaluation,
         ucb_constant=exploration_constant,
         progress_bar=log_level == "DEBUG",
     )
+
+
+def create_state_evaluation(strategy: str) -> Optional[MCTSEval]:
+    """Creates a MCTS leaf evaluation strategy
+
+    Mapping from configuration to online-planning leaf evaluation method
+
+    :param strategy: description of the evalutation (in ["", "inverted_goal_distance"])
+    :return: an evaluation strategy for POUCT
+    """
+    # base case
+    if not strategy:
+        return None
+
+    if strategy == "inverted_goal_distance":
+
+        def evaluation(s: GridversePositionAugmentedState, o, t: bool, info) -> float:
+            """State evalution, calls ``inverted_goal_distance`` if not terminal
+
+
+            Follows the protocol of ``Evaluation`` in ``MCTS`` of ``online_pomdp_planning``
+            """
+            if t:
+                return 0.0
+            return inverted_goal_distance(s.domain_state)
+
+        return evaluation
+
+    raise ValueError(f"pouct_evaluation {strategy} is not supported")
 
 
 def create_belief(
@@ -499,21 +524,19 @@ if __name__ == "__main__":
         "--exploration", type=float, default=1, help="PO-UCT (UCB) exploration constant"
     )
 
-    # parser.add_argument(
-    #     "--rollout_policy",
-    #     type=str,
-    #     choices=["", "default", "gridverse-extra"],
-    #     default="",
-    #     help="Rollout policy description; currently only applicable to gridverse,\
-    #             which accepts 'gridverse-extra' for the extra-good rollout",
-    # )
-
     parser.add_argument(
         "--search_depth",
         "-d",
         type=int,
         default=0,
         help="The max depth of the MCTS search tree, if not set will be horizon",
+    )
+
+    parser.add_argument(
+        "--pouct_evaluation",
+        choices=["", "inverted_goal_distance"],
+        default="",
+        help="Heuristic used during MCTS. Defaults to random rollouts",
     )
 
     parser.add_argument(

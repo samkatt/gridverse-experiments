@@ -5,4 +5,5 @@ simulations: 32
 rollout_depth: 100
 particles: 32
 logging: "DEBUG"
+pouct_evaluation = ""  # in ["", "inverted_goal_distance"]
 # save_path: "/tmp/to/some/experiments/folder"

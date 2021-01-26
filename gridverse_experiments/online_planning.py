@@ -11,7 +11,8 @@ Call this script with a path to the environment YAML file and parameters::
 
     python gridverse_experiments/online_planning.py \
             configs/gv_empty.4x4.yaml \
-            --logging DEBUG --runs 5 --ucb 5 --sim 128 --part 16
+            --logging DEBUG --runs 5 --ucb 5 --sim 128 --part 16 \
+            --pouct_evaluation inverted_goal_distance
 
 Otherwise use as a library and provide YAML files to
 
@@ -28,7 +29,7 @@ import argparse
 import logging
 import os
 import shutil
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 import yaml
@@ -38,6 +39,7 @@ from gym_gridverse.envs.yaml.factory import factory_env_from_yaml
 from gym_gridverse.observation import Observation as GVerseObs
 from gym_gridverse.state import State as GVerseState
 from online_pomdp_planning import types as planning_types
+from online_pomdp_planning.mcts import Evaluation as MCTSEval
 from online_pomdp_planning.mcts import create_POUCT
 from pomdp_belief_tracking import types as belief_types
 from pomdp_belief_tracking.pf.rejection_sampling import (
@@ -47,6 +49,7 @@ from pomdp_belief_tracking.pf.rejection_sampling import (
 )
 
 from gridverse_experiments import conf, utils
+from gridverse_experiments.heuristics import inverted_goal_distance
 
 
 def belief_sim_from(
@@ -267,12 +270,13 @@ def run_from_dict(args: Dict[str, Any]):
     try:
         domain = factory_env_from_yaml(args["env"])
 
+        state_evaluation = create_state_evaluation(args["pouct_evaluation"])
         planner = create_POUCT(
             actions=domain.action_space.actions,
             sim=planner_sim_from(domain),
             num_sims=args["simulations"],
             init_stats=None,
-            policy=None,
+            leaf_eval=state_evaluation,
             ucb_constant=args["ucb_constant"],
             rollout_depth=args["rollout_depth"],
             discount_factor=args["discount_factor"],
@@ -309,6 +313,35 @@ def run_from_dict(args: Dict[str, Any]):
         pd.DataFrame(result).to_pickle(
             os.path.join(args["save_path"], "timestep_data.pkl")
         )
+
+
+def create_state_evaluation(strategy: str) -> Optional[MCTSEval]:
+    """Creates a MCTS leaf evaluation strategy
+
+    Mapping from configuration to online-planning leaf evaluation method
+
+    :param strategy: description of the evalutation (in ["", "inverted_goal_distance"])
+    :return: an evaluation strategy for POUCT
+    """
+    # base case
+    if not strategy:
+        return None
+
+    if strategy == "inverted_goal_distance":
+
+        def evaluation(s: GVerseState, o, t: bool, info) -> float:
+            """State evalution, calls ``inverted_goal_distance`` if not terminal
+
+
+            Follows the protocol of ``Evaluation`` in ``MCTS`` of ``online_pomdp_planning``
+            """
+            if t:
+                return 0.0
+            return inverted_goal_distance(s)
+
+        return evaluation
+
+    raise ValueError(f"pouct_evaluation {strategy} is not supported")
 
 
 def generate_config_expansions(yaml_template_path: str) -> None:
@@ -352,6 +385,9 @@ if __name__ == "__main__":
     parser.add_argument("--ucb_constant", "-u", type=float, default=1)
     parser.add_argument("--simulations", "-s", type=int, default=32)
     parser.add_argument("--rollout_depth", "-d", type=int, default=100)
+    parser.add_argument(
+        "--pouct_evaluation", choices=["", "inverted_goal_distance"], default=""
+    )
 
     parser.add_argument("--particles", "-b", type=int, default=32)
     parser.add_argument("--save_path", type=str)
