@@ -284,6 +284,7 @@ def run_from_dict(args: Dict[str, Any]):
             if args["logging"] == "DEBUG"
             else accept_noop
         )
+
         belief_update = create_rejection_sampling(
             sim=belief_sim_from(domain),
             n=args["particles"],
@@ -306,7 +307,7 @@ def run_from_dict(args: Dict[str, Any]):
             yaml.dump(args, outfile, default_flow_style=False)
         shutil.copyfile(args["env"], os.path.join(args["save_path"], "env.yaml"))
         pd.DataFrame(result).to_pickle(
-            os.path.join(args["save_path"], "episodic_data.pkl")
+            os.path.join(args["save_path"], "timestep_data.pkl")
         )
 
 

@@ -35,7 +35,7 @@ def main():
     if args.method == "online_planning":
         run_online_planning(args.env, args.method_config)
     elif args.method == "gba_pomdp":
-        run_gbapomdp(args.method_config)
+        run_gbapomdp(args.env, args.method_config)
 
 
 if __name__ == "__main__":

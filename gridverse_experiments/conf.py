@@ -64,7 +64,7 @@ def expand_conf(
     output = {}
     for assignment in product(*expanding_values):
         assigned_conf = dict(zip(expanding_labels, assignment))
-        name = sep.join([k + pair_sep + str(v) for k, v in assigned_conf.items()])
+        name = sep.join([f"{k}{pair_sep}{v}" for k, v in assigned_conf.items()])
         output[name] = {**static_config, **assigned_conf}
 
     return output
