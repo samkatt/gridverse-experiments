@@ -7,7 +7,7 @@ num_sims: 512
 exploration: 1
 # rollout_policy: "" # ["", "default", "gridverse-extra"]  # NYI
 search_depth: 0
-pouct_evaluation = "inverted_goal_distance"  # in ["", "inverted_goal_distance"]
+pouct_evaluation: "inverted_goal_distance"  # in ["", "inverted_goal_distance"]
 belief: rejection_sampling # in ["rejection_sampling", "importance_sampling"]
 num_particles: 512
 belief_minimal_sample_size: 0 # in ["on_true", "on_prior"]
