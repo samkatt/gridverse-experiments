@@ -17,6 +17,7 @@ requirements = [
     "numpy",
     "pyyaml",
     "pandas",
+    "seaborn",
 ]
 
 setup_requirements = [
@@ -46,6 +47,7 @@ setup(
     entry_points={
         "console_scripts": [
             "gridverse_experiments=gridverse_experiments.cli:main",
+            "gridverse_viz=gridverse_experiments.cli:viz",
         ],
     },
     install_requires=requirements,
