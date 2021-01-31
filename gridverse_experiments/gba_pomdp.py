@@ -115,7 +115,7 @@ def main(conf: Dict[str, Any]) -> None:
         conf["dropout_rate"],
         conf["num_pretrain_epochs"],
         conf["batch_size"],
-        option="position_and_orientation",
+        model_type="position_and_orientation",
     )
 
     planner = create_planner(
