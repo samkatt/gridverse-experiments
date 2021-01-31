@@ -19,6 +19,15 @@ Otherwise use as a library and provide YAML files to
 .. autofunction:: run_from_yaml
    :noindex:
 
+It is also possible to provide a template for YAML files and have them
+automatically expanded into separate configurations, using all possible
+combinations::
+
+    # in python
+    from gridverse_experiments.online_planning import generate_config_expansions
+    generate_config_expansions(path/to/template.yaml)
+
+
 .. _Gridverse: https://github.com/abaisero/gym-gridverse
 .. _online-planners:  https://github.com/samkatt/online-pomdp-planners
 .. _belief-tracking:  https://github.com/samkatt/pomdp-belief-tracking

@@ -26,6 +26,14 @@ Otherwise use as a library and provide YAML files to
 .. autofunction:: run_from_yaml
    :noindex:
 
+It is also possible to provide a template for YAML files and have them
+automatically expanded into separate configurations, using all possible
+combinations::
+
+    # in python
+    from gridverse_experiments.gba_pomdp import generate_config_expansions
+    generate_config_expansions(path/to/template.yaml)
+
 """
 
 import logging
@@ -460,7 +468,7 @@ def run_from_yaml(env_yaml_file: str, solution_params_yaml: str):
     main(args)
 
 
-def generate_config_expansions(yaml_template_path: str) -> None:
+def generate_config_expansions(yaml_template_path: str, use_tensorboard: bool) -> None:
     """Tool to generate ``config.yaml`` files from ``yaml_template_path``
 
     Assumes ``yaml_template_path`` is a ``yaml`` file that contains list
@@ -468,6 +476,7 @@ def generate_config_expansions(yaml_template_path: str) -> None:
     set. This function will do so, and write them to disk under a sane name
 
     :param yaml_template_path: path to template config file with list entries
+    :param tensorboard: whether to save a tensorboard path
     :returns: None, writes to disk
     """
 
@@ -483,6 +492,7 @@ def generate_config_expansions(yaml_template_path: str) -> None:
         # hard-coded info: this script uses "save_path" to store results into
         # here we set this variable, knowing ``n`` is unique
         c["save_path"] = n
+        c["tensorboard_logdir"] = n if use_tensorboard else ""
         expansions_name = f"{n}.yaml"
         with open(expansions_name, "w") as output_file:
             yaml.dump(c, output_file, default_flow_style=False)
