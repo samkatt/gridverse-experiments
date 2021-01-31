@@ -51,7 +51,6 @@ from general_bayes_adaptive_pomdps.models.partial.domain.gridverse_gbapomdps imp
 from general_bayes_adaptive_pomdps.models.partial.partial_gbapomdp import (
     GBAPOMDPThroughAugmentedState,
 )
-from gym_gridverse.action import Action as GVerseAction
 from gym_gridverse.envs.inner_env import InnerEnv
 from gym_gridverse.envs.yaml.factory import factory_env_from_yaml
 from gym_gridverse.representations.observation_representations import (
@@ -84,8 +83,9 @@ def main(conf: Dict[str, Any]) -> None:
 
     utils.set_logging_options(conf["logging"])
     logger = logging.getLogger("GBA-POMDP")
+    tboard_logging = conf["tensorboard_logdir"]
 
-    if conf["tensorboard_logdir"]:
+    if tboard_logging:
         general_bayes_adaptive_pomdps.pytorch_api.set_tensorboard_logging(
             conf["tensorboard_logdir"]
         )
@@ -107,6 +107,7 @@ def main(conf: Dict[str, Any]) -> None:
         conf["dropout_rate"],
         conf["num_pretrain_epochs"],
         conf["batch_size"],
+        option="position_and_orientation",
     )
 
     planner = create_planner(
@@ -224,11 +225,11 @@ def run_episode(
 
         # actual step
         action, planning_info = planner(belief.sample)
-        r, t = env.step(GVerseAction(action))
+        r, t = env.step(env.action_space.int_to_action(action))
 
         logger.debug(
             "A(%s) -> (%s %s) --- r(%s)",
-            GVerseAction(action),
+            env.action_space.int_to_action(action),
             env.state.agent.position,
             env.state.agent.orientation,
             r,

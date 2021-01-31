@@ -39,7 +39,8 @@ def log_tensorboard(tag: str, val: Union[float, np.ndarray], step: int) -> None:
     if np.isscalar(val):
         _TENSORBOARD_WRITER.add_scalar(tag, val, step)
     else:
-        _TENSORBOARD_WRITER.add_histogram(tag, val, step)
+        # cast to numpy array in case we pass a list
+        _TENSORBOARD_WRITER.add_histogram(tag, np.array(val), step)
 
 
 def tensorboard_logging() -> bool:

@@ -41,10 +41,10 @@ def compare_online_planning_return(
         y="reward",
         x="simulations",
         # style="rollout_depth",
-        # size="particles",
-        hue="ucb_constant",
+        # size="ucb_constant",
+        hue="particles",
         col="rollout_depth",
-        row="particles",
+        row="ucb_constant",
     )
 
     plt.show()
