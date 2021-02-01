@@ -11,6 +11,7 @@ belief: rejection_sampling # in ["rejection_sampling", "importance_sampling"]
 num_particles: 32
 belief_minimal_sample_size: 0 # in ["on_true", "on_prior"]
 optimizer: "Adam" # in ["SGD", "Adam"]
+prior_option: "noise_turn_orientation"
 learning_rate: .005
 online_learning_rate: .0001
 network_size: 32

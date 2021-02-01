@@ -116,6 +116,7 @@ def main(conf: Dict[str, Any]) -> None:
         conf["num_pretrain_epochs"],
         conf["batch_size"],
         model_type="position_and_orientation",
+        prior_option=conf["prior_option"],
     )
 
     planner = create_planner(
@@ -149,7 +150,7 @@ def main(conf: Dict[str, Any]) -> None:
         for episode in range(conf["episodes"]):
 
             # TODO: there has to be a better way
-            if episode > 0:
+            if episode > 0 or run > 0:
                 belief.distribution = PF.apply(
                     set_domain_state,  # type: ignore
                     belief.distribution,
@@ -572,12 +573,14 @@ if __name__ == "__main__":
         type=float,
     )
 
-    # parser.add_argument(
-    #     "--train_offline",
-    #     choices=["on_true", "on_prior"],
-    #     default="on_true",
-    #     help="which, if applicable, type of learning to use",
-    # )
+    parser.add_argument(
+        "--prior_option",
+        type=str,
+        choices=["", "noise_turn_orientation"],
+        help="""Type of prior to train on, 
+        '' is on true data, 
+        'noise_turn_orientation` adds noise to the orientation on turn actions""",
+    )
 
     parser.add_argument(
         "--optimizer",
@@ -639,26 +642,7 @@ if __name__ == "__main__":
         help="the log directory for tensorboard",
     )
 
-    # parser.add_argument(
-    #     "--perturb_stdev",
-    #     default=0,
-    #     type=float,
-    #     help="the amount of parameter pertubation applies during belief updates",
-    # )
-
-    # parser.add_argument(
-    #     "--backprop",
-    #     action="store_true",
-    #     help="whether to apply backprop during belief updates",
-    # )
-
     parser.add_argument("--dropout_rate", type=float, help="dropout rate", default=0)
-
-    # parser.add_argument(
-    #     "--replay_update",
-    #     action="store_true",
-    #     help="whether to do updates from the replay buffer during belief updates",
-    # )
 
     parser.add_argument(
         "--save_path",
