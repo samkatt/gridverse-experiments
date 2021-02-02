@@ -48,6 +48,7 @@ setup(
         "console_scripts": [
             "gridverse_experiments=gridverse_experiments.cli:main",
             "gridverse_viz=gridverse_experiments.cli:viz",
+            "gridverse_utils=gridverse_experiments.cli:utils",
         ],
     },
     install_requires=requirements,

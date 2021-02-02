@@ -32,7 +32,7 @@ combinations::
 
     # in python
     from gridverse_experiments.gba_pomdp import generate_config_expansions
-    generate_config_expansions(path/to/template.yaml)
+    generate_config_expansions(path/to/template.yaml, use_tensorboard=False)
 
 """
 
