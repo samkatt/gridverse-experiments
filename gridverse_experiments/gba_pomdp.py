@@ -59,6 +59,7 @@ from general_bayes_adaptive_pomdps.models.partial.domain.gridverse_gbapomdps imp
 from general_bayes_adaptive_pomdps.models.partial.partial_gbapomdp import (
     GBAPOMDPThroughAugmentedState,
 )
+from gym_gridverse.envs.gridworld import GridWorld
 from gym_gridverse.envs.inner_env import InnerEnv
 from gym_gridverse.envs.yaml.factory import factory_env_from_yaml
 from gym_gridverse.representations.observation_representations import (
@@ -106,9 +107,10 @@ def main(conf: Dict[str, Any]) -> None:
         set_random_seed(conf["random_seed"])
 
     env = factory_env_from_yaml(conf["env"])
+    assert isinstance(env, GridWorld)
 
     baddr = create_gbapomdp(
-        env,  # type: ignore
+        env,
         conf["optimizer"],
         conf["learning_rate"],
         conf["network_size"],
@@ -118,6 +120,7 @@ def main(conf: Dict[str, Any]) -> None:
         conf["num_nets"],
         model_type="position_and_orientation",
         prior_option=conf["prior_option"],
+        online_learning_rate=conf["online_learning_rate"],
     )
 
     planner = create_planner(
