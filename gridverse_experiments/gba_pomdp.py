@@ -115,6 +115,7 @@ def main(conf: Dict[str, Any]) -> None:
         conf["dropout_rate"],
         conf["num_pretrain_epochs"],
         conf["batch_size"],
+        conf["num_nets"],
         model_type="position_and_orientation",
         prior_option=conf["prior_option"],
     )
