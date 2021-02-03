@@ -346,7 +346,7 @@ def create_state_evaluation(strategy: str) -> Optional[MCTSEval]:
             """
             if t:
                 return 0.0
-            return inverted_goal_distance(s, multiplier=1)
+            return inverted_goal_distance(s, multiplier=1.0)
 
         return evaluation
 

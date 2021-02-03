@@ -10,9 +10,8 @@ search_depth: 0
 pouct_evaluation: "inverted_goal_distance"  # in ["", "inverted_goal_distance"]
 belief: rejection_sampling # in ["rejection_sampling", "importance_sampling"]
 num_particles: 512
-belief_minimal_sample_size: 0 # in ["on_true", "on_prior"]
 # train_offline: "on_true"  # NYI
-prior_option: "" # in ["", "noise_turn_orientation"]
+prior_option: "" # in ["", "noise_turn_orientation", "noise_forward_step"]
 optimizer: "SGD" # in ["SGD", "Adam"]
 learning_rate: .001
 online_learning_rate: .0001

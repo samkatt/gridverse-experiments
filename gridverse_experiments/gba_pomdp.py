@@ -33,7 +33,6 @@ combinations::
     # in python
     from gridverse_experiments.gba_pomdp import generate_config_expansions
     generate_config_expansions(path/to/template.yaml, use_tensorboard=False)
-
 """
 
 import logging
@@ -82,7 +81,7 @@ def main(conf: Dict[str, Any]) -> None:
     """
 
     # post process arguments
-    if not conf["search_depth"]:
+    if conf["search_depth"] < 0:
         conf["search_depth"] = conf["horizon"]
     if not conf["belief_minimal_sample_size"]:
         conf["belief_minimal_sample_size"] = conf["num_particles"]
@@ -332,7 +331,7 @@ def create_state_evaluation(strategy: str) -> Optional[MCTSEval]:
             """
             if t:
                 return 0.0
-            return inverted_goal_distance(s.domain_state, multiplier=1)
+            return inverted_goal_distance(s.domain_state, multiplier=1.0)
 
         return evaluation
 
@@ -546,7 +545,7 @@ if __name__ == "__main__":
         "--search_depth",
         "-d",
         type=int,
-        default=0,
+        default=-1,
         help="The max depth of the MCTS search tree, if not set will be horizon",
     )
 
@@ -580,10 +579,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "--prior_option",
         type=str,
-        choices=["", "noise_turn_orientation"],
+        choices=["", "noise_turn_orientation", "noise_forward_step"],
         help="""Type of prior to train on, 
         '' is on true data, 
-        'noise_turn_orientation` adds noise to the orientation on turn actions""",
+        'noise_turn_orientation' adds noise to the orientation on turn actions 
+        'noise_forward_step' adds noise to how far you step forward
+        """,
     )
 
     parser.add_argument(
