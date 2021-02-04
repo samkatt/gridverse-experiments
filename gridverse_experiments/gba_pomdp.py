@@ -463,7 +463,7 @@ class SimForPlanning(planner_types.Simulator):
         return next_s, obs.data.tobytes(), reward, terminal
 
 
-def run_from_yaml(env_yaml_file: str, solution_params_yaml: str):
+def run_from_yaml(env_yaml_file: str, solution_params_yaml: str, overwrites: Dict[str, str] = {}):
     """Calls :func:`plan_online` with arguments described in YAML
 
     :param env_yaml_file: YAML path to env (`configs/gv_empty.4x4.deterministic_agent.yaml`)
@@ -473,6 +473,13 @@ def run_from_yaml(env_yaml_file: str, solution_params_yaml: str):
         args = yaml.safe_load(f)
 
     args["env"] = env_yaml_file
+
+    # TODO: probably generalize or at least put in a function
+    for overwritten_key, overwritten_value in overwrites:
+        assert overwritten_key in args
+        # cast value to correct type
+        args[overwritten_key] = type(args[overwritten_key])(overwritten_value)
+
     main(args)
 
 

@@ -1,10 +1,12 @@
 #!/usr/bin/env python
 """Tests for `gridverse_experiments` package."""
 
+import pytest
 
 from gridverse_experiments.builtin_gbapomdp import (
     run_from_yaml as run_builtin_gba_pomdp,
 )
+from gridverse_experiments.cli import parse_overwrites
 from gridverse_experiments.gba_pomdp import run_from_yaml as run_gba_pomdp
 from gridverse_experiments.online_planning import (
     run_from_dict as online_planning_from_dict,
@@ -12,6 +14,18 @@ from gridverse_experiments.online_planning import (
 from gridverse_experiments.online_planning import (
     run_from_yaml as online_planning_from_yaml,
 )
+
+
+@pytest.mark.parametrize(
+    "overwrites,parsed",
+    [
+        (["key=value"], {"key": "value"}),
+        (["key=value2"], {"key": "value2"}),
+        (["key=value2", "another key=2"], {"key": "value2", "another key": "2"}),
+    ],
+)
+def test_parse_overwrites(overwrites, parsed):
+    assert parse_overwrites(overwrites) == parsed
 
 
 def test_online_planning_runs():

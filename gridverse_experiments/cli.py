@@ -24,6 +24,7 @@ Example usage utility::
 """
 import argparse
 import sys
+from typing import Dict, List
 
 from gridverse_experiments.gba_pomdp import (
     generate_config_expansions as gba_pomdp_generate_config_expansions,
@@ -36,6 +37,18 @@ from gridverse_experiments.visualization.viz_online_planning import (
 )
 
 
+def parse_overwrites(overwrites: List[str]) -> Dict[str, str]:
+    """Parse list 'key=value' into dictionary of str -> str
+
+    :param overwrites:
+    :returns: A dictionary of key -> value pairs extracted from ``overwrites``
+    """
+    try:
+        return dict(str.split("=") for str in overwrites)
+    except ValueError:
+        raise ValueError(f"Unable to parse extra arguments {overwrites}")
+
+
 def main():
     """Console script for gridverse_experiments."""
     parser = argparse.ArgumentParser()
@@ -43,12 +56,13 @@ def main():
     parser.add_argument("env", help="YAML file describing gridverse environment")
     parser.add_argument("method_config", help="YAML file describing method parameters")
 
-    args = parser.parse_args()
+    args, overwrites = parser.parse_known_args()
 
     if args.method == "online_planning":
+        # TODO: allow for overwrites
         run_online_planning(args.env, args.method_config)
     if args.method == "gba_pomdp":
-        run_gbapomdp(args.env, args.method_config)
+        run_gbapomdp(args.env, args.method_config, parse_overwrites(overwrites))
 
 
 def viz():
