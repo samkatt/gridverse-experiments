@@ -475,7 +475,7 @@ def run_from_yaml(env_yaml_file: str, solution_params_yaml: str, overwrites: Dic
     args["env"] = env_yaml_file
 
     # TODO: probably generalize or at least put in a function
-    for overwritten_key, overwritten_value in overwrites:
+    for overwritten_key, overwritten_value in overwrites.items():
         assert overwritten_key in args
         # cast value to correct type
         args[overwritten_key] = type(args[overwritten_key])(overwritten_value)
