@@ -15,11 +15,12 @@ combination of belief-tracking_ and online-planning_.
 Example usage::
 
     python gridverse_experiments/gba_pomdp.py \
-            configs/gv_empty.8x8.yaml --logging DEBUG \
-            --episodes 2 --pouct_evaluation inverted_goal_distance \
-            -B rejection_sampling --learning_rate .025 \
-            --tensorboard experiments/heuristic-8x8/nodrop-025a \
-            --num_pret 4096
+            configs/gv_empty.4x4.yaml --logging DEBUG \
+            --episodes 2 --search_depth 0 \
+            -B rejection_sampling --learning_rate .25 \
+            --tensorboard experiments/heuristic-4x4/nodrop-025a \
+            --num_pret 128 --prior_option "" \
+            --num_sims 32 --num_part 128 --online_learn 0 --runs 3 --episodes 2
 
 Otherwise use as a library and provide YAML files to
 
@@ -176,10 +177,13 @@ def main(conf: Dict[str, Any]) -> None:
             avg_recent_return.append(discounted_return)
 
             logger.warning(
-                "Episode %s/%s return: %s",
+                "run %s/%s episode %s/%s return: %s (avg: %s)",
+                run + 1,
+                conf["runs"],
                 episode + 1,
                 conf["episodes"],
                 discounted_return,
+                np.mean(avg_recent_return),
             )
             logger.info(
                 f"run {run+1}/{conf['runs']} episode {episode+1}/{conf['episodes']}: "
