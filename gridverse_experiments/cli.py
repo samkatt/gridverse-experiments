@@ -1,11 +1,19 @@
 """Console script for gridverse_experiments.
 
-Example usage online planning::
+Contains entry points for::
+
+    - running experiments,
+    - visualizing results, and
+    - utility functions
+
+There are two main types of experiments, `planning` and `learning`. In
+`planning` the domain dynamics are given. Example usage online planning::
 
     gridverse_experiments online_planning \
             configs/gv_empty.4x4.deterministic_agent.yaml \
             configs/example_online_planning.yaml
 
+In `learning` only some prior knowledge (e.g. in the form of data) is known.
 Example usage general Bayes-adaptive POMDP::
 
 
@@ -13,19 +21,28 @@ Example usage general Bayes-adaptive POMDP::
             configs/gv_empty.4x4.deterministic_agent.yaml \
             configs/example_gba_pomdp.yaml
 
-Example usage visualization ::
+To visualize, indicate whether you would like to compare `planning` or
+`learning` experiments. Example usage visualization ::
 
     gridverse_viz online_planning file1 file2 file3
 
-Example usage utility::
+This package provides some additional utility functionality to make either
+running or analyzing experiments easier. To expand a `yaml` file of parameters
+(with list) into one of each combination (all combinations of the parameters
+        specified as lists)::
 
     gridverse_utils expand_parameter_file <path/to/file> gba_pomdp --tensorboard
 
+Alternatively, to condence time-step (`timestep_data.pkl`) results into episodic data::
+
+    gridverse_utils condense_timestep_to_episodic <output_file> <input_file1> <input_file2>...
 """
+
 import argparse
 import sys
 from typing import Dict, List
 
+from gridverse_experiments.gba_pomdp import condense_timestep_data_to_episodic
 from gridverse_experiments.gba_pomdp import (
     generate_config_expansions as gba_pomdp_generate_config_expansions,
 )
@@ -89,6 +106,15 @@ def utils():
 
     cmd_subparsers = parser.add_subparsers(dest="cmd")
 
+    # condensing time-step data into episodic data
+    condense_timestep_parser = cmd_subparsers.add_parser(
+        "condense_timestep_to_episodic"
+    )
+    condense_timestep_parser.add_argument("output_file")
+    condense_timestep_parser.add_argument("input_files", nargs="+")
+
+    # expand params parser
+    # TODO: add online_pomdp
     expand_params_parser = cmd_subparsers.add_parser("expand_parameter_file")
     expand_params_parser.add_argument("file", help="Param yaml file to expand")
 
@@ -96,7 +122,6 @@ def utils():
     expand_gba_pomdp_param_parser = expand_method_param_subparser.add_parser(
         "gba_pomdp"
     )
-    # TODO: add online_pomdp
 
     expand_gba_pomdp_param_parser.add_argument(
         "--tensorboard",
@@ -110,6 +135,10 @@ def utils():
     if args.cmd == "expand_parameter_file":
         if args.method == "gba_pomdp":
             gba_pomdp_generate_config_expansions(args.file, args.tensorboard)
+    elif args.cmd == "condense_timestep_to_episodic":
+        condense_timestep_data_to_episodic(
+            args.output_file, import_experiment_dirs(args.input_files)
+        )
 
 
 if __name__ == "__main__":

@@ -463,7 +463,9 @@ class SimForPlanning(planner_types.Simulator):
         return next_s, obs.data.tobytes(), reward, terminal
 
 
-def run_from_yaml(env_yaml_file: str, solution_params_yaml: str, overwrites: Dict[str, str] = {}):
+def run_from_yaml(
+    env_yaml_file: str, solution_params_yaml: str, overwrites: Dict[str, str] = {}
+):
     """Calls :func:`plan_online` with arguments described in YAML
 
     :param env_yaml_file: YAML path to env (`configs/gv_empty.4x4.deterministic_agent.yaml`)
@@ -668,3 +670,74 @@ if __name__ == "__main__":
     )
 
     main(vars(parser.parse_args()))
+
+
+def condense_timestep_data_to_episodic(
+    output_file: str, experiments: Iterable[Tuple[str, Dict[str, Any], pd.DataFrame]]
+) -> None:
+    """Prints episodic summary of data in ``experiments`` to ``output_file``
+
+    Called to summarize 'time_step_data.pkl' files into a single 'episodic_data.pkl' file. This file contains a dataframe with episodic data:
+
+        - run
+        - episode
+        - (un)discounted return
+        - terminal
+        - plan_runtime,
+        - belief_update_runtime,
+        - rejection_sampling_iteration,
+        - mcts_num_action_nodes,
+        - random_seed
+
+    :param output_file: path to write pandas data frame to (assumed pickle)
+    :param experiments: generator of [name, args, data frame] tuplets
+    """
+
+    # hard-coded domain knowledge
+    grouping_columns = ["run", "episode"]
+    columns_to_sum = ["reward", "discounted_reward", "terminal"]
+    columns_to_mean = [
+        "plan_runtime",
+        "belief_update_runtime",
+        "rejection_sampling_iteration",
+        "mcts_num_action_nodes",
+    ]
+
+    def process_df(time_step_df: pd.DataFrame, args: Dict[str, Any]) -> pd.DataFrame:
+
+        time_step_df["discounted_reward"] = time_step_df["reward"] * pow(
+            args["gamma"], time_step_df["timestep"]
+        )
+
+        episodic_df_sum = (
+            time_step_df[grouping_columns + columns_to_sum]
+            .groupby(grouping_columns)
+            .sum()
+            .reset_index()
+        )
+        episodic_df_mean = (
+            time_step_df[grouping_columns + columns_to_mean]
+            .groupby(grouping_columns)
+            .mean()
+            .reset_index()
+        )
+
+        # rename reward into returns, since we have summed them
+        episodic_df_sum.rename(
+            columns={
+                "reward": "undiscounted_return",
+                "discounted_reward": "discounted_return",
+            },
+            inplace=True,
+        )
+
+        pf = pd.merge(episodic_df_sum, episodic_df_mean)
+
+        # add label for this particular pf
+        pf["random_seed"] = args["random_seed"]
+
+        return pf
+
+    episodic_df = pd.concat([process_df(df, args) for _, args, df in experiments])
+
+    episodic_df.to_pickle(output_file)

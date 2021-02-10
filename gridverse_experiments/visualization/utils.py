@@ -10,7 +10,7 @@ import yaml
 def import_experiment_dirs(
     dirs: List[str],
 ) -> Iterable[Tuple[str, Dict[str, Any], pd.DataFrame]]:
-    """Returns a generator of (file-name, dataframe) tuples
+    """Returns a generator of (file-name, args, dataframe) tuples
 
     :param dirs:
     :return: (file-name, args, dfs) tuples generator
