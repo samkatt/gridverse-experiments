@@ -24,7 +24,7 @@ Example usage general Bayes-adaptive POMDP::
 To visualize, indicate whether you would like to compare `planning` or
 `learning` experiments. Example usage visualization ::
 
-    gridverse_viz online_planning file1 file2 file3
+    gridverse_viz online_planning/gba_pomdp file1 file2 file3
 
 This package provides some additional utility functionality to make either
 running or analyzing experiments easier. To expand a `yaml` file of parameters
@@ -42,13 +42,14 @@ import argparse
 import sys
 from typing import Dict, List
 
-from gridverse_experiments.gba_pomdp import condense_timestep_data_to_episodic
 from gridverse_experiments.gba_pomdp import (
     generate_config_expansions as gba_pomdp_generate_config_expansions,
 )
 from gridverse_experiments.gba_pomdp import run_from_yaml as run_gbapomdp
+from gridverse_experiments.gba_pomdp import summarize_timestep_into_episodic_data
 from gridverse_experiments.online_planning import run_from_yaml as run_online_planning
 from gridverse_experiments.visualization.utils import import_experiment_dirs
+from gridverse_experiments.visualization.viz_gba_pomdp import compare_gba_pomdp_return
 from gridverse_experiments.visualization.viz_online_planning import (
     compare_online_planning_return,
 )
@@ -86,7 +87,7 @@ def viz():
     """Console script for gridverse_viz."""
     print("vizzing..!")
     parser = argparse.ArgumentParser()
-    parser.add_argument("option", choices=["online_planning"])
+    parser.add_argument("option", choices=["online_planning", "gba_pomdp"])
     parser.add_argument(
         "files",
         nargs="+",
@@ -96,7 +97,13 @@ def viz():
     args = parser.parse_args()
 
     if args.option == "online_planning":
-        compare_online_planning_return(import_experiment_dirs(args.files))
+        compare_online_planning_return(
+            import_experiment_dirs(args.files, "params.yaml", "timestep_data.pkl")
+        )
+    if args.option == "gba_pomdp":
+        compare_gba_pomdp_return(
+            import_experiment_dirs(args.files, "params.yaml", "episodic_data.pkl")
+        )
 
 
 def utils():
@@ -110,8 +117,8 @@ def utils():
     condense_timestep_parser = cmd_subparsers.add_parser(
         "condense_timestep_to_episodic"
     )
-    condense_timestep_parser.add_argument("output_file")
-    condense_timestep_parser.add_argument("input_files", nargs="+")
+    condense_timestep_parser.add_argument("save_path")
+    condense_timestep_parser.add_argument("experiment_dirs", nargs="+")
 
     # expand params parser
     # TODO: add online_pomdp
@@ -136,8 +143,11 @@ def utils():
         if args.method == "gba_pomdp":
             gba_pomdp_generate_config_expansions(args.file, args.tensorboard)
     elif args.cmd == "condense_timestep_to_episodic":
-        condense_timestep_data_to_episodic(
-            args.output_file, import_experiment_dirs(args.input_files)
+        summarize_timestep_into_episodic_data(
+            args.save_path,
+            import_experiment_dirs(
+                args.experiment_dirs, "params.yaml", "timestep_data.pkl"
+            ),
         )
 
 

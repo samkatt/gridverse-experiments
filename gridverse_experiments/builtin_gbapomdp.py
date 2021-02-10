@@ -91,7 +91,7 @@ def main(conf: Dict[str, Any]) -> None:
         conf["belief_minimal_sample_size"] = conf["num_particles"]
 
     if "save_path" in conf and conf["save_path"]:
-        utils.create_experiments_directory_or_exit(conf["save_path"])
+        utils.create_directory_or_exit(conf["save_path"])
 
     utils.set_logging_options(conf["logging"])
     logger = logging.getLogger("GBA-POMDP")

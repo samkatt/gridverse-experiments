@@ -311,7 +311,7 @@ def run_from_dict(args: Dict[str, Any]):
         exit()
 
     if "save_path" in args and args["save_path"]:
-        utils.create_experiments_directory_or_exit(args["save_path"])
+        utils.create_directory_or_exit(args["save_path"])
 
     result = main(domain, planner, belief, args["runs"], args["logging"])
 

@@ -46,7 +46,7 @@ def discounted_return(rewards: List[float], discount: float) -> float:
     return sum(pow(discount, i) * r for i, r in enumerate(rewards))
 
 
-def create_experiments_directory_or_exit(exp_dir_path: str) -> None:
+def create_directory_or_exit(exp_dir_path: str) -> None:
     """Creates a directory at ``exp_dir_path``
 
     NOTE: exits the program when exists, this is considered an unresolvable

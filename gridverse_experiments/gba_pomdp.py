@@ -42,7 +42,8 @@ import shutil
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
 from collections import deque
 from functools import partial
-from typing import Any, Dict, List, Optional, Tuple
+from timeit import default_timer as timer
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import general_bayes_adaptive_pomdps.pytorch_api
 import numpy as np
@@ -88,7 +89,7 @@ def main(conf: Dict[str, Any]) -> None:
         conf["belief_minimal_sample_size"] = conf["num_particles"]
 
     if "save_path" in conf and conf["save_path"]:
-        utils.create_experiments_directory_or_exit(conf["save_path"])
+        utils.create_directory_or_exit(conf["save_path"])
 
     utils.set_logging_options(conf["logging"])
     logger = logging.getLogger("GBA-POMDP")
@@ -160,7 +161,9 @@ def main(conf: Dict[str, Any]) -> None:
                     belief.distribution,
                 )
 
+            t = timer()  # XXX
             episode_output = run_episode(env, planner, belief, conf["horizon"])
+            runtime = timer() - t  # XXX
 
             # here we explicitly add the information of which run the result
             # was generated to each entry in the results
@@ -185,10 +188,16 @@ def main(conf: Dict[str, Any]) -> None:
                 discounted_return,
                 np.mean(avg_recent_return),
             )
-            logger.info(
-                f"run {run+1}/{conf['runs']} episode {episode+1}/{conf['episodes']}: "
-                f"avg return: {np.mean(avg_recent_return)}"
-            )
+
+            # XXX
+            if tboard_logging:
+                general_bayes_adaptive_pomdps.pytorch_api.log_tensorboard(
+                    f"runtime", runtime, episode
+                )
+                general_bayes_adaptive_pomdps.pytorch_api.log_tensorboard(
+                    f"return", discounted_return, episode
+                )
+            # XXX
 
     if "save_path" in conf and conf["save_path"]:
         with open(os.path.join(conf["save_path"], "params.yaml"), "w") as outfile:
@@ -672,10 +681,58 @@ if __name__ == "__main__":
     main(vars(parser.parse_args()))
 
 
-def condense_timestep_data_to_episodic(
-    output_file: str, experiments: Iterable[Tuple[str, Dict[str, Any], pd.DataFrame]]
+def timestep_to_episodic_data(
+    time_step_df: pd.DataFrame, args: Dict[str, Any]
+) -> pd.DataFrame:
+
+    # hard-coded domain knowledge
+    grouping_columns = ["run", "episode"]
+    columns_to_sum = ["reward", "discounted_reward", "terminal"]
+    columns_to_mean = [
+        "plan_runtime",
+        "belief_update_runtime",
+        "rejection_sampling_iteration",
+        "mcts_num_action_nodes",
+    ]
+
+    time_step_df["discounted_reward"] = time_step_df["reward"] * pow(
+        args["gamma"], time_step_df["timestep"]
+    )
+
+    episodic_df_sum = (
+        time_step_df[grouping_columns + columns_to_sum]
+        .groupby(grouping_columns)
+        .sum()
+        .reset_index()
+    )
+    episodic_df_mean = (
+        time_step_df[grouping_columns + columns_to_mean]
+        .groupby(grouping_columns)
+        .mean()
+        .reset_index()
+    )
+
+    # rename reward into returns, since we have summed them
+    episodic_df_sum.rename(
+        columns={
+            "reward": "undiscounted_return",
+            "discounted_reward": "discounted_return",
+        },
+        inplace=True,
+    )
+
+    pf = pd.merge(episodic_df_sum, episodic_df_mean)
+
+    # add label for this particular pf
+    pf["random_seed"] = args["random_seed"]
+
+    return pf
+
+
+def summarize_timestep_into_episodic_data(
+    save_path: str, experiments: Iterable[Tuple[str, Dict[str, Any], pd.DataFrame]]
 ) -> None:
-    """Prints episodic summary of data in ``experiments`` to ``output_file``
+    """Prints episodic summary of data in ``experiments`` to ``save_path``
 
     Called to summarize 'time_step_data.pkl' files into a single 'episodic_data.pkl' file. This file contains a dataframe with episodic data:
 
@@ -689,55 +746,37 @@ def condense_timestep_data_to_episodic(
         - mcts_num_action_nodes,
         - random_seed
 
-    :param output_file: path to write pandas data frame to (assumed pickle)
+    :param save_path: path to write pandas data frame to (assumed pickle)
     :param experiments: generator of [name, args, data frame] tuplets
     """
 
-    # hard-coded domain knowledge
-    grouping_columns = ["run", "episode"]
-    columns_to_sum = ["reward", "discounted_reward", "terminal"]
-    columns_to_mean = [
-        "plan_runtime",
-        "belief_update_runtime",
-        "rejection_sampling_iteration",
-        "mcts_num_action_nodes",
+    utils.create_directory_or_exit(save_path)
+
+    # [(args1, episodic_data1), (args2 ....]
+    args_and_episodic_df = [
+        (args, timestep_to_episodic_data(df, args)) for _, args, df in experiments
     ]
+    episodic_df = pd.concat([df for _, df in args_and_episodic_df])
 
-    def process_df(time_step_df: pd.DataFrame, args: Dict[str, Any]) -> pd.DataFrame:
+    # combine arguments into single dictionary, save values as sets to identify
+    # all unique values
+    episodic_args = {}
 
-        time_step_df["discounted_reward"] = time_step_df["reward"] * pow(
-            args["gamma"], time_step_df["timestep"]
-        )
+    for args, _ in args_and_episodic_df:
+        for key, val in args.items():
+            try:
+                episodic_args[key].add(val)
+            except KeyError:
+                episodic_args[key] = {val}
 
-        episodic_df_sum = (
-            time_step_df[grouping_columns + columns_to_sum]
-            .groupby(grouping_columns)
-            .sum()
-            .reset_index()
-        )
-        episodic_df_mean = (
-            time_step_df[grouping_columns + columns_to_mean]
-            .groupby(grouping_columns)
-            .mean()
-            .reset_index()
-        )
+    # return sets into values, or lists if multiple
+    for key, val in episodic_args.items():
+        if len(val) == 1:
+            episodic_args[key] = val.pop()
+        else:
+            episodic_args[key] = list(val)
 
-        # rename reward into returns, since we have summed them
-        episodic_df_sum.rename(
-            columns={
-                "reward": "undiscounted_return",
-                "discounted_reward": "discounted_return",
-            },
-            inplace=True,
-        )
-
-        pf = pd.merge(episodic_df_sum, episodic_df_mean)
-
-        # add label for this particular pf
-        pf["random_seed"] = args["random_seed"]
-
-        return pf
-
-    episodic_df = pd.concat([process_df(df, args) for _, args, df in experiments])
-
-    episodic_df.to_pickle(output_file)
+    # save to files
+    episodic_df.to_pickle(os.path.join(save_path, "episodic_data.pkl"))
+    with open(os.path.join(save_path, "params.yaml"), "w") as outfile:
+        yaml.dump(episodic_args, outfile, default_flow_style=False)
