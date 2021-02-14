@@ -146,7 +146,7 @@ def main(conf: Dict[str, Any]) -> None:
         augmented_state.domain_state = env.functional_reset()
         return augmented_state
 
-    output: List[Dict[str, Any]] = []
+    output: List[pd.Series] = []
 
     for run in range(conf["runs"]):
 
@@ -162,21 +162,20 @@ def main(conf: Dict[str, Any]) -> None:
                 )
 
             t = timer()  # XXX
-            episode_output = run_episode(env, planner, belief, conf["horizon"])
+            episode_output = pd.DataFrame(
+                run_episode(env, planner, belief, conf["horizon"])
+            )
             runtime = timer() - t  # XXX
 
-            # here we explicitly add the information of which run the result
-            # was generated to each entry in the results
-            for o in episode_output:
-                o["episode"] = episode
-                o["run"] = run
-
-            # extend -- flat concatenation -- of our results
-            output.extend(episode_output)
-
-            discounted_return = utils.discounted_return(
-                [t["reward"] for t in episode_output], conf["gamma"]
+            episode_output["episode"] = episode
+            episode_output["run"] = run
+            episode_output = timestep_to_episodic_data(
+                pd.DataFrame(episode_output), conf
             )
+
+            output.append(episode_output.loc[0])
+
+            discounted_return = float(episode_output["discounted_return"])
             avg_recent_return.append(discounted_return)
 
             logger.warning(
@@ -204,7 +203,7 @@ def main(conf: Dict[str, Any]) -> None:
             yaml.dump(conf, outfile, default_flow_style=False)
         shutil.copyfile(conf["env"], os.path.join(conf["save_path"], "env.yaml"))
         pd.DataFrame(output).to_pickle(
-            os.path.join(conf["save_path"], "timestep_data.pkl")
+            os.path.join(conf["save_path"], "episodic_data.pkl")
         )
 
 
@@ -465,7 +464,7 @@ class SimForPlanning(planner_types.Simulator):
         :param s: input state
         :param a: input action
         """
-        next_s, obs = self.gbapomdp.simulation_step(s, a)  # TODO: no copy!
+        next_s, obs = self.gbapomdp.domain_simulation_step(s, a)
         reward = self.gbapomdp.reward(s, a, next_s)
         terminal = self.gbapomdp.terminal(s, a, next_s)
 
@@ -721,30 +720,17 @@ def timestep_to_episodic_data(
         inplace=True,
     )
 
-    pf = pd.merge(episodic_df_sum, episodic_df_mean)
-
-    # add label for this particular pf
-    pf["random_seed"] = args["random_seed"]
-
-    return pf
+    return pd.merge(episodic_df_sum, episodic_df_mean)
 
 
-def summarize_timestep_into_episodic_data(
+def merge_experiments(
     save_path: str, experiments: Iterable[Tuple[str, Dict[str, Any], pd.DataFrame]]
 ) -> None:
-    """Prints episodic summary of data in ``experiments`` to ``save_path``
+    """Merges episodic summary of data in ``experiments`` to ``save_path``
 
-    Called to summarize 'time_step_data.pkl' files into a single 'episodic_data.pkl' file. This file contains a dataframe with episodic data:
-
-        - run
-        - episode
-        - (un)discounted return
-        - terminal
-        - plan_runtime,
-        - belief_update_runtime,
-        - rejection_sampling_iteration,
-        - mcts_num_action_nodes,
-        - random_seed
+    Called to summarize 'episodic_data.pkl' files into a single master
+    'episodic_data.pkl' file. This file contains a dataframe with episodic
+    data:
 
     :param save_path: path to write pandas data frame to (assumed pickle)
     :param experiments: generator of [name, args, data frame] tuplets
@@ -752,17 +738,13 @@ def summarize_timestep_into_episodic_data(
 
     utils.create_directory_or_exit(save_path)
 
-    # [(args1, episodic_data1), (args2 ....]
-    args_and_episodic_df = [
-        (args, timestep_to_episodic_data(df, args)) for _, args, df in experiments
-    ]
-    episodic_df = pd.concat([df for _, df in args_and_episodic_df])
+    experiments = list(experiments)
 
     # combine arguments into single dictionary, save values as sets to identify
     # all unique values
     episodic_args = {}
 
-    for args, _ in args_and_episodic_df:
+    for _, args, _ in experiments:
         for key, val in args.items():
             try:
                 episodic_args[key].add(val)
@@ -776,7 +758,9 @@ def summarize_timestep_into_episodic_data(
         else:
             episodic_args[key] = list(val)
 
+    dfs = pd.concat([df for _, _, df in experiments])
+
     # save to files
-    episodic_df.to_pickle(os.path.join(save_path, "episodic_data.pkl"))
+    dfs.to_pickle(os.path.join(save_path, "episodic_data.pkl"))
     with open(os.path.join(save_path, "params.yaml"), "w") as outfile:
         yaml.dump(episodic_args, outfile, default_flow_style=False)

@@ -33,9 +33,9 @@ running or analyzing experiments easier. To expand a `yaml` file of parameters
 
     gridverse_utils expand_parameter_file <path/to/file> gba_pomdp --tensorboard
 
-Alternatively, to condence time-step (`timestep_data.pkl`) results into episodic data::
+Alternatively, to merge experiments (`episodic_data.pkl`) results into episodic data::
 
-    gridverse_utils condense_timestep_to_episodic <output_file> <input_file1> <input_file2>...
+    gridverse_utils merge_experiments <output_file> <input_file1> <input_file2>...
 """
 
 import argparse
@@ -45,8 +45,8 @@ from typing import Dict, List
 from gridverse_experiments.gba_pomdp import (
     generate_config_expansions as gba_pomdp_generate_config_expansions,
 )
+from gridverse_experiments.gba_pomdp import merge_experiments
 from gridverse_experiments.gba_pomdp import run_from_yaml as run_gbapomdp
-from gridverse_experiments.gba_pomdp import summarize_timestep_into_episodic_data
 from gridverse_experiments.online_planning import run_from_yaml as run_online_planning
 from gridverse_experiments.visualization.utils import import_experiment_dirs
 from gridverse_experiments.visualization.viz_gba_pomdp import compare_gba_pomdp_return
@@ -114,11 +114,9 @@ def utils():
     cmd_subparsers = parser.add_subparsers(dest="cmd")
 
     # condensing time-step data into episodic data
-    condense_timestep_parser = cmd_subparsers.add_parser(
-        "condense_timestep_to_episodic"
-    )
-    condense_timestep_parser.add_argument("save_path")
-    condense_timestep_parser.add_argument("experiment_dirs", nargs="+")
+    merge_experiments_parser = cmd_subparsers.add_parser("merge_experiments")
+    merge_experiments_parser.add_argument("save_path")
+    merge_experiments_parser.add_argument("experiment_dirs", nargs="+")
 
     # expand params parser
     # TODO: add online_pomdp
@@ -142,11 +140,11 @@ def utils():
     if args.cmd == "expand_parameter_file":
         if args.method == "gba_pomdp":
             gba_pomdp_generate_config_expansions(args.file, args.tensorboard)
-    elif args.cmd == "condense_timestep_to_episodic":
-        summarize_timestep_into_episodic_data(
+    elif args.cmd == "merge_experiments":
+        merge_experiments(
             args.save_path,
             import_experiment_dirs(
-                args.experiment_dirs, "params.yaml", "timestep_data.pkl"
+                args.experiment_dirs, "params.yaml", "episodic_data.pkl"
             ),
         )
 
