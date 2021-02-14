@@ -24,12 +24,9 @@ def compare_gba_pomdp_return(
 
     df = pd.concat(df[2] for df in timestep_dfs)
 
-    # compute sums over episodes, grouped by parameters
-    episodic_mean = df.groupby(["episode", "label"]).mean().reset_index()
-
     # plot
     sns.lineplot(
-        data=episodic_mean,
+        data=df,
         y="discounted_return",
         x="episode",
         # style="rollout_depth",
