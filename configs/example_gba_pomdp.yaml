@@ -9,6 +9,7 @@ exploration: 1
 search_depth: 0
 pouct_evaluation: "inverted_goal_distance"  # in ["", "inverted_goal_distance"]
 belief: rejection_sampling # in ["rejection_sampling", "importance_sampling"]
+belief_minimal_sample_size: 0
 num_particles: 512
 # train_offline: "on_true"  # NYI
 prior_option: "" # in ["", "noise_turn_orientation", "noise_forward_step"]
