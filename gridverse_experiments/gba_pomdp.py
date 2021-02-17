@@ -53,7 +53,7 @@ import pomdp_belief_tracking.types as belief_types
 import yaml
 from general_bayes_adaptive_pomdps.misc import set_random_seed
 from general_bayes_adaptive_pomdps.models.partial.domain.gridverse_gbapomdps import (
-    GridversePositionAugmentedState,
+    GridverseAugmentedGodState,
     create_gbapomdp,
     gverse_obs2array,
 )
@@ -66,6 +66,7 @@ from gym_gridverse.envs.yaml.factory import factory_env_from_yaml
 from gym_gridverse.representations.observation_representations import (
     DefaultObservationRepresentation,
 )
+from gym_gridverse.state import State as GVerseState
 from online_pomdp_planning.mcts import Evaluation as MCTSEval
 from online_pomdp_planning.mcts import create_POUCT as lib_create_POUCT
 from pomdp_belief_tracking.pf import importance_sampling as IS
@@ -141,7 +142,7 @@ def main(conf: Dict[str, Any]) -> None:
         conf["logging"],
     )
 
-    def set_domain_state(augmented_state: GridversePositionAugmentedState):
+    def set_domain_state(augmented_state: GridverseAugmentedGodState):
         """sets domain state in ``s`` to sampled initial state """
         augmented_state.domain_state = env.functional_reset()
         return augmented_state
@@ -261,10 +262,6 @@ def run_episode(
 
         belief_info = belief.update(action, obs2array(env.observation))
 
-        logger.debug(
-            "Planner output: %s \nBelief output: %s", planning_info, belief_info
-        )
-
         info.append(
             {
                 "timestep": timestep,
@@ -335,7 +332,7 @@ def create_state_evaluation(strategy: str) -> Optional[MCTSEval]:
 
     if strategy == "inverted_goal_distance":
 
-        def evaluation(s: GridversePositionAugmentedState, o, t: bool, info) -> float:
+        def evaluation(s: GridverseAugmentedGodState, o, t: bool, info) -> float:
             """State evalution, calls ``inverted_goal_distance`` if not terminal
 
 
@@ -395,7 +392,7 @@ def create_rejection_sampling(
         RS.AcceptionProgressBar(num_samples) if log_level == "DEBUG" else RS.accept_noop
     )
 
-    def process_acpt(ss: GridversePositionAugmentedState, ctx, info):
+    def process_acpt(ss: GridverseAugmentedGodState, ctx, info):
         # update the parameters of the augmented state
         # without modifying original state
         progress_bar(ss, ctx, info)
@@ -403,7 +400,7 @@ def create_rejection_sampling(
             ctx["state"], ctx["action"], ss, ctx["observation"]
         )
 
-    def belief_sim(s: GridversePositionAugmentedState, a: int):
+    def belief_sim(s: GridverseAugmentedGodState, a: int):
         return s.domain_step(a)
 
     return RS.create_rejection_sampling(
@@ -430,7 +427,7 @@ def create_importance_sampling(
     def transition_func(s, a):
         return baddr.simulation_step(s, a, optimize=True).state
 
-    def obs_model(s, a, ss: GridversePositionAugmentedState, o) -> float:
+    def obs_model(s, a, ss: GridverseAugmentedGodState, o) -> float:
         # XXX: we know the observation function is deterministic. We also know
         # exaclty how it is called under the hood. So here we call it, and see
         # if it produces the observation perceived by the agent
@@ -764,3 +761,44 @@ def merge_experiments(
     dfs.to_pickle(os.path.join(save_path, "episodic_data.pkl"))
     with open(os.path.join(save_path, "params.yaml"), "w") as outfile:
         yaml.dump(episodic_args, outfile, default_flow_style=False)
+
+
+def report_belief_accuracy(
+    true_state: GVerseState, belief: PF.ParticleFilter
+) -> Dict[str, Any]:
+    """Returns a string -> value report over the belief
+
+    Specifically reports the percentage of correct:
+
+        - positions
+        - orientations
+        - states (positions & orientations)
+
+    :param true_state:
+    :param belief:
+    :returns: {str -> float}
+    """
+    correct_states = 0.0
+    correct_pos = 0.0
+    correct_orientations = 0.0
+
+    count = 0
+    for augmented_state, _ in belief:
+        agent_in_particle = augmented_state.domain_state.agent
+
+        pos_is_correct = agent_in_particle.position == true_state.agent.position
+        orientation_is_correct = (
+            agent_in_particle.orientation == true_state.agent.orientation
+        )
+
+        correct_pos += pos_is_correct
+        correct_orientations += orientation_is_correct
+        correct_states += pos_is_correct and orientation_is_correct
+
+        count += 1
+
+    return {
+        "prob_correct_state": correct_states / count,
+        "prob_correct_pos": correct_pos / count,
+        "prob_correct_orientation": correct_orientations / count,
+    }
