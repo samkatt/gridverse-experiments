@@ -1,9 +1,10 @@
 runs: 5
+horizon: 20
 discount_factor: .95
 ucb_constant: 5
 simulations: 32
 rollout_depth: 100
 particles: 32
 logging: "DEBUG"
-pouct_evaluation: ""  # in ["", "inverted_goal_distance"]
+pouct_evaluation: "" # in ["", "inverted_goal_distance"]
 # save_path: "/tmp/to/some/experiments/folder"

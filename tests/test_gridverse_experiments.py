@@ -33,6 +33,7 @@ def test_online_planning_runs():
     args = {
         "env": "tests/configs/gv_empty.4x4.deterministic_agent.yaml",
         "runs": 2,
+        "horizon": 100,
         "discount_factor": 0.95,
         "ucb_constant": 1,
         "simulations": 32,

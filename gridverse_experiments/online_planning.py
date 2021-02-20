@@ -121,11 +121,13 @@ def episode(
     planner: planning_types.Planner,
     belief: belief_types.Belief,
     domain: InnerEnv,
+    horizon: int,
 ) -> List[Dict[str, Any]]:
     """Runs a single episode
 
     Acts in ``domain`` according to actions picked by ``planner``, using
-    beliefs updated by the ``belief_update`` starting from ``belief``.
+    beliefs updated by the ``belief_update`` starting from ``belief``. Runs
+    until termination, or ``horizon`` is reached
 
     Returns a list of dictionaries, one for each timestep. The dictionary includes things as:
 
@@ -135,22 +137,21 @@ def episode(
         - information from the planner info
         - information from belief info
 
-    TODO: include horizon
-
     :param planner: the belief-based policy
     :param belief: updates belief in between taking actions
     :param domain: the actual environment in which actions are taken
+    :param horizon: the max number of timesteps
     :return: a list of episode results (rewards and info dictionaries)
     """
+    assert horizon > 0
+
     logger = logging.getLogger("episode")
 
     domain.reset()
 
     info: List[Dict[str, Any]] = []
 
-    terminal = False
-    timestep = 0
-    while not terminal:
+    for timestep in range(horizon):
 
         logger.debug("%s, planning action...", domain.state.agent)
 
@@ -179,6 +180,9 @@ def episode(
             }
         )
 
+        if terminal:
+            break
+
         timestep += 1
 
     return info
@@ -189,6 +193,7 @@ def main(
     planner: planning_types.Planner,
     belief: belief_types.Belief,
     runs: int,
+    horizon: int,
     logging_level: str,
 ) -> List[Dict[str, Any]]:
     """plan online function of online planning
@@ -207,11 +212,13 @@ def main(
 
     :param domain:
     :param planner:
-    :param belief:
-    :param runs:
+    :param belief: initial belief
+    :param runs: number of runs
+    :param horizon: max length of a run
     :param logging_level:
     :return: flat concatenation of the results of each episode
     """
+    assert runs > 0
 
     utils.set_logging_options(logging_level)
 
@@ -224,9 +231,7 @@ def main(
         belief.distribution = domain.functional_reset
 
         episode_output = episode(
-            planner=planner,
-            belief=belief,
-            domain=domain,
+            planner=planner, belief=belief, domain=domain, horizon=horizon
         )
 
         # here we explicitly add the information of which run the result was
@@ -313,7 +318,9 @@ def run_from_dict(args: Dict[str, Any]):
     if "save_path" in args and args["save_path"]:
         utils.create_directory_or_exit(args["save_path"])
 
-    result = main(domain, planner, belief, args["runs"], args["logging"])
+    result = main(
+        domain, planner, belief, args["runs"], args["horizon"], args["logging"]
+    )
 
     if "save_path" in args and args["save_path"]:
         with open(os.path.join(args["save_path"], "params.yaml"), "w") as outfile:
@@ -389,6 +396,7 @@ if __name__ == "__main__":
 
     parser.add_argument("env")
     parser.add_argument("--runs", "-n", type=int, default=1)
+    parser.add_argument("--horizon", "-n", type=int, default=1000)
     parser.add_argument("--discount_factor", "-y", type=float, default=0.95)
 
     parser.add_argument("--ucb_constant", "-u", type=float, default=1)
