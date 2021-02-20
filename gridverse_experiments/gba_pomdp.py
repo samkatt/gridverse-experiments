@@ -262,6 +262,13 @@ def run_episode(
 
         belief_info = belief.update(action, obs2array(env.observation))
 
+        logger.debug(
+            "Planner output: %s \nBelief output: %s, %s",
+            planning_info,
+            belief_info,
+            report_belief_accuracy(env.state, belief.distribution),
+        )
+
         info.append(
             {
                 "timestep": timestep,

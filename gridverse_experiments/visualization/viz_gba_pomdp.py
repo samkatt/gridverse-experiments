@@ -8,30 +8,25 @@ Can be called via the command line through::
 
 from typing import Any, Dict, Iterable, Tuple
 
-import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
 
-def compare_gba_pomdp_return(
+def plot_dataframe(df: pd.DataFrame) -> None:
+    sns.lineplot(
+        data=df,
+        y="discounted_return",
+        x="episode",
+        hue="label",
+    )
+
+
+def gba_pomdp_returns_to_pd(
     experiments: Iterable[Tuple[str, Dict[str, Any], pd.DataFrame]]
-):
-    # prepare dataframe
+) -> pd.DataFrame:
     timestep_dfs = list(experiments)
 
     for f, _, df in timestep_dfs:
         df["label"] = f
 
-    df = pd.concat(df[2] for df in timestep_dfs)
-
-    # plot
-    sns.lineplot(
-        data=df,
-        y="discounted_return",
-        x="episode",
-        # style="rollout_depth",
-        # size="ucb_constant",
-        hue="label",
-    )
-
-    plt.show()
+    return pd.concat(df[2] for df in timestep_dfs)

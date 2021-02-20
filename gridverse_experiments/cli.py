@@ -42,6 +42,8 @@ import argparse
 import sys
 from typing import Dict, List
 
+import matplotlib.pyplot as plt
+
 from gridverse_experiments.gba_pomdp import (
     generate_config_expansions as gba_pomdp_generate_config_expansions,
 )
@@ -49,7 +51,10 @@ from gridverse_experiments.gba_pomdp import merge_experiments
 from gridverse_experiments.gba_pomdp import run_from_yaml as run_gbapomdp
 from gridverse_experiments.online_planning import run_from_yaml as run_online_planning
 from gridverse_experiments.visualization.utils import import_experiment_dirs
-from gridverse_experiments.visualization.viz_gba_pomdp import compare_gba_pomdp_return
+from gridverse_experiments.visualization.viz_gba_pomdp import (
+    gba_pomdp_returns_to_pd,
+    plot_dataframe,
+)
 from gridverse_experiments.visualization.viz_online_planning import (
     compare_online_planning_return,
 )
@@ -89,21 +94,24 @@ def viz():
     parser = argparse.ArgumentParser()
     parser.add_argument("option", choices=["online_planning", "gba_pomdp"])
     parser.add_argument(
-        "files",
+        "directories",
         nargs="+",
-        help="Panda frame files to compare",
+        help="experiment directories to compare",
     )
 
     args = parser.parse_args()
 
     if args.option == "online_planning":
         compare_online_planning_return(
-            import_experiment_dirs(args.files, "params.yaml", "timestep_data.pkl")
+            import_experiment_dirs(args.directories, "params.yaml", "timestep_data.pkl")
         )
     if args.option == "gba_pomdp":
-        compare_gba_pomdp_return(
-            import_experiment_dirs(args.files, "params.yaml", "episodic_data.pkl")
+        df = gba_pomdp_returns_to_pd(
+            import_experiment_dirs(args.directories, "params.yaml", "episodic_data.pkl")
         )
+
+        plot_dataframe(df)
+        plt.show()
 
 
 def utils():
