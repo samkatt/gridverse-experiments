@@ -194,6 +194,7 @@ def main(
     belief: belief_types.Belief,
     runs: int,
     horizon: int,
+    discount_factor: float,
     logging_level: str,
 ) -> List[Dict[str, Any]]:
     """plan online function of online planning
@@ -215,6 +216,7 @@ def main(
     :param belief: initial belief
     :param runs: number of runs
     :param horizon: max length of a run
+    :param discount_factor: `gamma`
     :param logging_level:
     :return: flat concatenation of the results of each episode
     """
@@ -246,7 +248,7 @@ def main(
             "run %s/%s terminated: r(%s)",
             run + 1,
             runs,
-            utils.discounted_return([t["reward"] for t in episode_output], 0.95),
+            utils.discounted_return([t["reward"] for t in episode_output], discount_factor),
         )
 
     return output
@@ -319,7 +321,7 @@ def run_from_dict(args: Dict[str, Any]):
         utils.create_directory_or_exit(args["save_path"])
 
     result = main(
-        domain, planner, belief, args["runs"], args["horizon"], args["logging"]
+        domain, planner, belief, args["runs"], args["horizon"], args["discount_factor"], args["logging"]
     )
 
     if "save_path" in args and args["save_path"]:
